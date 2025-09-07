@@ -113,17 +113,30 @@ You should answer these questions for checkoff.  In each case:
 write a bit of C code, and be prepared to explain how the machine code
 it produces shows your answer is correct.
   1. What register holds a pointer (not integer) return value?
+	foo.c: r0 - you can see in foo.s that the return value is moved to r0
   2. What register holds the third pointer argument to a routine?
+	int rptr3.c: there is a store r2, [fp -16] which is the address of 3rd pointer.
+	Later, there is a ldr r3, [fp-16] which load that address back to r3 and ldr r3, [r3]
+	- effectively deference to the underlying int.
+	By the way, ARM leaves space one the stack = #args + 1. The +1 is the saved return adddress - like the LINK command in SaM in your compiler class. That is why the first argument is from (fp-4 ... `fp-8`]
   3. If register `r1` holds a memory address (a pointer), 
      what instruction do you use to store an 8-bit integer to that location?
+	loadstore.c: The argument char 8 bit is at fp-9 while the addr is (fp-4...fp-8], you can see we load that char to r2, zero-ext it, load value of target addr to r3 and then do
+	store r2, [r3] <- taking addr at r3 (which refers to memory) and store r2 at it.
   4. Same as (3) but for load?
+	ldr r3, [r3] , taking addr at r3 and fetch memory from that and store at r3
   5. Load/store 16-bit?
+	Same as above - with zero-extension required.
   6. Load/store 32-bit?
+	Same as above but 32-bit does not require zero-extension.
   7. Write some C code that will cause the compiler to emit a `bx`
      instruction that *is not* a function return.
+	bx.c: We put the function pointer (represent as the label: in assembly) to a register , says r3, i.e., assigning it a variable in c code var = f //. Now if we do var() i.e., evaluate the function, the assembly code will do bx r3
   8. What does an infinite loop look like?  Why?
+	infinite.c: you have a fall through assembly, cmp and branch instruction based on the loop predicate (if true will go to the backedge. Othewise, fall through and leave).
   9. How do you call a routine whose address is in a register rather
      than a constant?  (You'll use this in the threads lab.)
+	I speculate that this is about the system call in which the address of the instruction is at the "known address". I think we just ldr ri, [known addr]. and bx ri. In this case, the address is already at the register so there is no need for load. There is a difference between bx (tail call) and blx (call with link - which saves return address in lr) - in SaM, you do JUMPIND (which takes the saved PC at the top of the stack and set PC <- TOS). You did this when wanting to return from a method invocation so that you continue where you left off.
 
 Finally implement the following routines. (Note: you should cheat by 
 using the compiler as above!)
@@ -147,6 +160,10 @@ using the compiler as above!)
      it compiles.
 
   4. Also implement `PUT16` and `PUT8`.
+	Done in mem-op.c. Looks like casting from void -> unsigned is for the compiler i.e., you don't see `casting` in assembly.
+	
+	The 32-bit address points to 1 byte value in memory. Meaning when you do int* p and *p, you are taking 4 consecutive address (sizeof(int) = 4), and reconstruct integer based from those 8 x 4 bits. Same thing for char* but here you reconstruct only from 1 address. That is why the pointer size = register size (does not matter what underlying data is, char, int, double the addr is 32 bit per byte). 
+	When you allocate a lot of char, it doesn't mean that you are wasting 32-bit address for every 8 bit store. You are wasting that much if only you ask for the `pointer` to each char (you never do). Usually you just ask for the head pointer of the consective char and do ++ptr.
 
 -------------------------------------------------------------------
 ## 3. Observability.
