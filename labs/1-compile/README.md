@@ -175,9 +175,21 @@ the modification and be able to explain how the machine code shows
 you are right:
 
   1. Give two different fixes for `2-wait.c` and check that they work.
+	Mark mbox->status as volatile
+	Add asm volatile ("" ::: "memory") to the instruction inside the while loop.
+	This forces the the program to perform fresh read despite not marking status
+	as volatile.
   2. Which of the two files `4-fb.c` and `5-fb.c` (or: both, neither) 
      have a problem?  What is it?  If one does and not the other, why?
      Give a fix.
+		
+	Actually, 4-fb.c should fail due to compiler reordering the instructions.
+	If we run gcc with, says -O3, we will observe that, for example, only
+	the instruction that store height=960 and width=1280 gets
+	store ri, [addr] before hte mbox->write is executed (compiler reorder).
+	This will cause the problem with peripheral that read the data as the
+	whole `struct` is not appropriately written (offset, etc instructions come after
+	mbox->write).	 
 
 ### Questions about example-pointer.
 
@@ -204,7 +216,14 @@ a previous 240 exam:
                 return;                
             }
             /* foo.c end */
-
+			None. lock and cnt is static and bar() may access it.
+			Currrently, the bar definition is opaque so the compiler
+			must be conservative. If it can prove that bar does not
+			access lock or cnt. It may optimize this away (but not guarantee).
+			Imagine that some parts of the program may have the access to
+			the pointer of lock and/or count (not lock and count directly because
+			they are static). In this case, changes at these memory locaitons are
+			observable.
 
    2. The compiler analyzes `foo` in isolation, can it
       reorder or remove any of the following assignments?
@@ -213,9 +232,10 @@ a previous 240 exam:
                 *q = 1;
                 *p = 2;
                 *q = 3;
-                return;
+                return;j
             }
-
+			If it can prove that q != p. *q=1 can be eliminated.
+			If q=p then only *q=3 is retained.
 
     3. How much of this code can gcc remove?  (Give your intuition!)
 
@@ -225,6 +245,9 @@ a previous 240 exam:
                 *p = 10;
                 return 0;
             }
+			Nobody can access int* p. So the *p=10 is deadstore.
+			The compiler may get rid of malloc completely (the bonus is
+			we don't have memory leak despite not calling free(p))).
 
 -------------------------------------------------------------------
 ## Post-script

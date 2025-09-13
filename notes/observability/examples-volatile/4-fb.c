@@ -35,13 +35,21 @@ static fb_config_t cp;
 void write_mailbox_x(mailbox_t *mbox, unsigned channel) {
     while(mbox->status & MAILBOX_FULL)
         ;
+	// there is a chance that the compiler thinks
+	// these stores are dead
+	// there could be mov ri 1280 etc
     cp.width = cp.virtual_width = 1280;
     cp.height = cp.virtual_height = 960;
     cp.depth = 32;
     cp.x_offset = cp.y_offset = 0;
     cp.pointer = 0;
 
+	// but there is no
+	// store ri, [cp offset]
+	
+	// the compiler may simply write these OR result to mbox->write
     mbox->write = ((unsigned)(&cp) | channel | 0x40000000);
+	// without store those attribute. Because it thinks those stores are dead.
 }
 
 
