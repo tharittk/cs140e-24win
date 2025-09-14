@@ -71,14 +71,10 @@
         strcat(new_prog, start_second_part);
     }
 
-    char* new_compile = new_prog;
-    if (new_compile != NULL){
-        fprintf(fp, "%s", new_compile);
-        fclose(fp);
-    }
+    // char* new_compile = new_prog;
+    program = new_prog;
+    // if (new_compile != NULL){
+    //     fprintf(fp, "%s", new_compile);
+    //     fclose(fp);
+    // }
 
-    // gross, call gcc.
-    char buf[1024];
-    sprintf(buf, "gcc ./temp-out.c -o %s", outname);
-    if(system(buf) != 0)
-        error("system failed\n");

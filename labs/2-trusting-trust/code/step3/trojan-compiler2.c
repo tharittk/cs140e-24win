@@ -11,12 +11,21 @@
 
 #define error(args...) do { fprintf(stderr, ##args); exit(1);  } while(0)
 
-// a not very interesting compile: throw the input into a 
-// temporary file and then call gcc on the result.
 static void compile(char *program, char *outname) {
-    #include "attack-quine.c"
-}
+    int i;
 
+    #include "attack-quine.c"
+
+    
+    // #include assign program = new program
+    fprintf(fp, "%s", program);
+    fclose(fp);
+    // gross, call gcc.
+    char buf[1024];
+    sprintf(buf, "gcc ./temp-out.c -o %s", outname);
+    if(system(buf) != 0)
+        error("system failed\n");
+}
 
 #   define N  8 * 1024 * 1024
 static char buf[N+1];
