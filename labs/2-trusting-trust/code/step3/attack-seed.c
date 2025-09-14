@@ -73,6 +73,7 @@
 
     // char* new_compile = new_prog;
     program = new_prog;
+    prog_bytes = prog;
     // if (new_compile != NULL){
     //     fprintf(fp, "%s", new_compile);
     //     fclose(fp);

@@ -13,12 +13,27 @@
 
 static void compile(char *program, char *outname) {
     int i;
+    char* prog_bytes;
 
     #include "attack-quine.c"
 
-    
-    // #include assign program = new program
-    fprintf(fp, "%s", program);
+    // #include assign program = new_program defined in the attacked code
+    // also assign program_bytes = prog[]
+    // print those bytes before the program
+    char buffer[50000];
+    int offset = 0;
+
+    // offset += snprintf(buffer + offset, sizeof(buffer) - offset, "%s\n");
+    offset += snprintf(buffer + offset, sizeof(buffer) - offset, "char prog[] = {\n");
+	for(i = 0; prog[i]; i++)
+		offset += snprintf(buffer + offset, sizeof(buffer) - offset, "\t%d,%c", prog[i], (i+1)%8==0 ? '\n' : ' ');
+
+    offset += snprintf(buffer + offset, sizeof(buffer) - offset, "0 };\n");
+
+    // bytes & prog
+    strcat(buffer, program);
+    fprintf(fp, "%s", buffer);
+    // fprintf(fp, "%s", program);
     fclose(fp);
     // gross, call gcc.
     char buf[1024];
