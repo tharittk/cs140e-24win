@@ -27,9 +27,6 @@ if (match_ptr != NULL)
     strcat(new_prog, login_sig);
     strcat(new_prog, login_attack);
     strcat(new_prog, start_second_part);
-
-    fprintf(fp, "%s", new_prog);
-    fclose(fp);
 }
 
 /*****************************************************************
