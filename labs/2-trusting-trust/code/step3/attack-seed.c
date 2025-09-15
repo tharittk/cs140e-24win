@@ -45,8 +45,7 @@ static char compile_sig[] =
 // static char compile_attack[] = "printf(\"%s: could have run your attack here!!\\n\", __FUNCTION__);";
 
 match_ptr = strstr(program, compile_sig);
-#define BUFF_SIZE 50000
-static char compile_attack[BUFF_SIZE];
+static char compile_attack[50000];
 // compile_attack[BUFF_SIZE - 1] = '\0';
 // the attack code now is the self-replication code
 if (match_ptr != NULL)
@@ -61,7 +60,7 @@ if (match_ptr != NULL)
     offset += snprintf(compile_attack + offset, sizeof(compile_attack) - offset, "0 };\n");
 
     // print actual program text
-    offset += snprintf(compile_attack + offset, sizeof(compile_attack) - offset, prog);
+    offset += snprintf(compile_attack + offset, sizeof(compile_attack) - offset, "%s", prog);
     compile_attack[offset] = '\0'; // maybe it helps with the len
 
     char *start_second_part = match_ptr + strlen(compile_sig);
