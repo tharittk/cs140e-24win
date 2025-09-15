@@ -29,8 +29,18 @@ void gpio_set_output(unsigned pin) {
     if(pin >= 32)
         return;
 
-  // implement this
   // use <gpio_fsel0>
+  // 0-9, 10-19, 20-29
+  unsigned reg_index = pin / 10;
+  unsigned bit_start = (pin % 10) * 3;
+
+  unsigned gpio_fseln = GPIO_BASE + 0x4 * reg_index;
+
+  // 001
+  uint32_t val = GET32(gpio_fseln);
+  val &= ~(0x7 << bit_start); // clear 3 bits
+  val |= (0x1 << bit_start); // set 001
+  PUT32(gpio_fseln, val);
 }
 
 // set GPIO <pin> on.
