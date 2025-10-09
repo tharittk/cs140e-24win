@@ -7,6 +7,7 @@
  *
  * See rpi.h in this directory for the definitions.
  */
+#include "gpio.h"
 #include "rpi.h"
 
 // see broadcomm documents for magic addresses.
@@ -17,18 +18,10 @@ enum {
   gpio_lev0 = (GPIO_BASE + 0x34)
 };
 
-//
-// Part 1 implement gpio_set_on, gpio_set_off, gpio_set_output
-//
+void gpio_set_function(unsigned pin, gpio_func_t function) {
 
-// set <pin> to be an output pin.
-//
-// note: fsel0, fsel1, fsel2 are contiguous in memory, so you
-// can (and should) use array calculations!
-void gpio_set_output(unsigned pin) {
-  if (pin >= 32 && pin != 47)
+  if ((pin >= 32 && pin != 47) || function > 7)
     return;
-  // use <gpio_fsel0>
   // 0-9, 10-19, 20-29
   unsigned reg_index = pin / 10;
   unsigned bit_start = (pin % 10) * 3;
@@ -36,10 +29,13 @@ void gpio_set_output(unsigned pin) {
   unsigned gpio_fseln = GPIO_BASE + 0x4 * reg_index;
 
   uint32_t val = GET32(gpio_fseln);
-  val &= ~(0x7 << bit_start); // clear 3 bits
-  val |= (0x1 << bit_start);  // set 001
+
+  val &= ~(0x7 << bit_start);     // clear 3 bits
+  val |= (function << bit_start); // 3-bit
   PUT32(gpio_fseln, val);
 }
+
+void gpio_set_output(unsigned pin) { gpio_set_function(pin, GPIO_FUNC_OUTPUT); }
 
 // set GPIO <pin> on.
 void gpio_set_on(unsigned pin) {
@@ -70,23 +66,8 @@ void gpio_write(unsigned pin, unsigned v) {
     gpio_set_off(pin);
 }
 
-//
-// Part 2: implement gpio_set_input and gpio_read
-//
-
 // set <pin> to input.
-void gpio_set_input(unsigned pin) {
-  if (pin >= 32 && pin != 47)
-    return;
-
-  unsigned reg_index = pin / 10;
-  unsigned bit_start = (pin % 10) * 3;
-  unsigned gpio_fseln = GPIO_BASE + 0x4 * reg_index;
-
-  uint32_t val = GET32(gpio_fseln);
-  val &= ~(0x7 << bit_start); // clear 3 bits - set to 000
-  PUT32(gpio_fseln, val);
-}
+void gpio_set_input(unsigned pin) { gpio_set_function(pin, GPIO_FUNC_INPUT); }
 
 // return the value of <pin>
 int gpio_read(unsigned pin) {
