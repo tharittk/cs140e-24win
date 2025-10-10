@@ -11,18 +11,22 @@
 #include "rpi.h"
 
 // see broadcomm documents for magic addresses.
-enum {
+enum
+{
   GPIO_BASE = 0x20200000,
   gpio_set0 = (GPIO_BASE + 0x1C),
+  gpio_set1 = (GPIO_BASE + 0x20),
   gpio_clr0 = (GPIO_BASE + 0x28),
+  gpio_clr1 = (GPIO_BASE + 0x2C),
   gpio_lev0 = (GPIO_BASE + 0x34)
 };
 
-void gpio_set_function(unsigned pin, gpio_func_t function) {
+void gpio_set_function(unsigned pin, gpio_func_t function)
+{
 
   if ((pin >= 32 && pin != 47) || function > 7)
     return;
-  // 0-9, 10-19, 20-29
+  // 0-9, 10-19, 20-29, 47
   unsigned reg_index = pin / 10;
   unsigned bit_start = (pin % 10) * 3;
 
@@ -38,25 +42,30 @@ void gpio_set_function(unsigned pin, gpio_func_t function) {
 void gpio_set_output(unsigned pin) { gpio_set_function(pin, GPIO_FUNC_OUTPUT); }
 
 // set GPIO <pin> on.
-void gpio_set_on(unsigned pin) {
+void gpio_set_on(unsigned pin)
+{
   if (pin >= 32 && pin != 47)
     return;
   // writing zero has no effect - see doc.
   // GET32 on this addr is undef. Writing it back
   // may change the state of other pins
-  PUT32(gpio_set0, 0x1 << pin);
+  unsigned reg = pin < 32 ? gpio_set0 : gpio_set1;
+  PUT32(reg, 0x1 << (pin) % 32);
 }
 
 // set GPIO <pin> off
-void gpio_set_off(unsigned pin) {
+void gpio_set_off(unsigned pin)
+{
   if (pin >= 32 && pin != 47)
     return;
 
-  PUT32(gpio_clr0, 0x1 << pin);
+  unsigned reg = pin < 32 ? gpio_clr0 : gpio_clr1;
+  PUT32(reg, 0x1 << (pin) % 32);
 }
 
 // set <pin> to <v> (v \in {0,1})
-void gpio_write(unsigned pin, unsigned v) {
+void gpio_write(unsigned pin, unsigned v)
+{
   if (pin >= 32 && pin != 47)
     return;
 
@@ -70,8 +79,9 @@ void gpio_write(unsigned pin, unsigned v) {
 void gpio_set_input(unsigned pin) { gpio_set_function(pin, GPIO_FUNC_INPUT); }
 
 // return the value of <pin>
-int gpio_read(unsigned pin) {
-  if (pin >= 32 && pin != 47)
+int gpio_read(unsigned pin)
+{
+  if (pin >= 32)
     return -1;
   uint32_t val = GET32(gpio_lev0);
   return DEV_VAL32((val >> pin) & 1);
