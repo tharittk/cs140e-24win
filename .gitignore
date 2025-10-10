@@ -11,3 +11,8 @@ staff-*.c
 staff
 
 *.dSYM*
+*.d*
+*.raw*
+*.out*
+*.o*
+*.a*
