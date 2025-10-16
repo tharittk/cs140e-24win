@@ -5,8 +5,8 @@
 //  without capture it's unsafe to call during UART operations since infinitely
 //  recursive and, also, will mess with the UART state.
 //
-//  record the calls in a log (just declare a statically sized array until we get malloc)
-//  for later emit by trace_dump()
+//  record the calls in a log (just declare a statically sized array until we
+//  get malloc) for later emit by trace_dump()
 //
 // extension: keep adding more functions!
 //      often it's useful to trace at a higher level, for example, doing
@@ -26,11 +26,10 @@ void __wrap_PUT32(unsigned addr, unsigned val);
 void __real_PUT32(unsigned addr, unsigned val);
 
 // simple state machine to track what set of options we're called with.
-enum
-{
-    TRACE_OFF = 0,
-    TRACE_ON,
-    TRACE_SKIP // if running w/o buffering, stop printing trace
+enum {
+  TRACE_OFF = 0,
+  TRACE_ON,
+  TRACE_SKIP // if running w/o buffering, stop printing trace
 };
 static int state = TRACE_OFF;
 
@@ -40,42 +39,47 @@ static int state = TRACE_OFF;
 //   <buffer_p> != 0 defers the printing until <trace_stop> is called.
 //
 //  is an error: if you were already tracing.
-void trace_start(int buffer_p)
-{
-    assert(state == TRACE_OFF);
-    state = TRACE_ON;
+void trace_start(int buffer_p) {
+  assert(state == TRACE_OFF);
+  state = TRACE_ON;
 }
 
 // stop tracing
 //  - error: if you were not already tracing.
-void trace_stop(void)
-{
-    assert(state == TRACE_ON);
-    state = TRACE_OFF;
-    // we would print things out if output was being buffered.
+void trace_stop(void) {
+  assert(state == TRACE_ON);
+  state = TRACE_OFF;
+  // we would print things out if output was being buffered.
 }
 
 // call these to emit so everyone can compare!
-static void emit_put32(uint32_t addr, uint32_t val)
-{
-    printk("TRACE:PUT32(0x%x)=0x%x\n", addr, val);
+static void emit_put32(uint32_t addr, uint32_t val) {
+  printk("TRACE:PUT32(%x)=%x\n", addr, val);
 }
-static void emit_get32(uint32_t addr, uint32_t val)
-{
-    printk("TRACE:GET32(0x%x)=0x%x\n", addr, val);
+static void emit_get32(uint32_t addr, uint32_t val) {
+  printk("TRACE:GET32(%x)=%x\n", addr, val);
 }
 
-// the linker will change all calls to GET32 to call __wrap_GET32
-void __wrap_PUT32(unsigned addr, unsigned val)
-{
+#define GPIO_BASE 0x20200000
+#define GPIO_END 0x202000B0
+
+static inline unsigned is_gpio_addr(uint32_t a) {
+  // prevent inifinite recursion when addr is that of UART
+  return (a >= GPIO_BASE && a <= GPIO_END);
+}
+
+void __wrap_PUT32(unsigned addr, unsigned val) {
+
+  if (is_gpio_addr(addr) && state) {
     emit_put32(addr, val);
-    __real_PUT32(addr, val);
+  }
+  __real_PUT32(addr, val);
 }
 
-// the linker will change all calls to GET32 to call __wrap_GET32
-unsigned __wrap_GET32(unsigned addr)
-{
-    unsigned v = __real_GET32(addr);
+unsigned __wrap_GET32(unsigned addr) {
+  unsigned v = __real_GET32(addr);
+  if (is_gpio_addr(addr) && state) {
     emit_get32(addr, v);
-    return v;
+  }
+  return v;
 }
