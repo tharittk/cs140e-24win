@@ -9,38 +9,44 @@
 #include "timer-interrupt.h"
 
 // Q: if you make not volatile?
+// A: the compiler will not re-read this value if some other parts
+// write to the peripheral's bit to change the value.
 static volatile unsigned cnt, period, period_sum;
 
 // client has to define this.
-void interrupt_vector(unsigned pc) {
+void interrupt_vector(unsigned pc)
+{
     dev_barrier();
     unsigned pending = GET32(IRQ_basic_pending);
 
     // if this isn't true, could be a GPU interrupt (as discussed in Broadcom):
     // just return.  [confusing, since we didn't enable!]
-    if((pending & RPI_BASIC_ARM_TIMER_IRQ) == 0)
-        return;
 
     // Checkoff: add a check to make sure we have a timer interrupt
     // use p 113,114 of broadcom.
+    if ((pending & RPI_BASIC_ARM_TIMER_IRQ) == 0)
+        return;
 
-    /* 
+    /*
      * Clear the ARM Timer interrupt - it's the only interrupt we have
      * enabled, so we don't have to work out which interrupt source
-     * caused us to interrupt 
+     * caused us to interrupt
      *
      * Q: what happens, exactly, if we delete?
+     * A: after the interrupted is handled, it will come back and
+     * handle that same interrupt source again ("interrupt remains asserted").
+     * See Broadcomm p109.
      */
     PUT32(arm_timer_IRQClear, 1);
 
     /*
-     * We do not know what the client code was doing: if it was touching a 
+     * We do not know what the client code was doing: if it was touching a
      * different device, then the broadcom doc states we need to have a
      * memory barrier.   NOTE: we have largely been living in sin and completely
-     * ignoring this requirement for UART.   (And also the GPIO overall.)  
+     * ignoring this requirement for UART.   (And also the GPIO overall.)
      * This is probably not a good idea and we should be more careful.
      */
-    dev_barrier();    
+    dev_barrier();
     cnt++;
 
     // compute time since the last interrupt.
@@ -51,20 +57,27 @@ void interrupt_vector(unsigned pc) {
     last_clk = clk;
 
     // Q: what happens (&why) if you uncomment the print statement?
+    // A: At this point, the IRQ is disabled (cleared prior to handling),
+    // and UART needs to interact with interrupt. Your system might hang (wait forever
+    // for UART to be ready - which is signaled via interrupt)
     // printk("In interrupt handler at time: %d\n", clk);
 }
 
 #include "cycle-count.h"
-void notmain() {
+void notmain()
+{
     printk("about to install interrupt handlers\n");
     int_init();
 
     printk("setting up timer interrupts\n");
     // Q: if you change 0x100?
+    // A: This is the count down. The larger number, the longer to
+    // wait until interrupt kicks off
     timer_interrupt_init(0x100);
 
     printk("gonna enable ints globally!\n");
     // Q: what happens (&why) if you don't do?
+    // A: it won't respond / or check the interrupt pending
     system_enable_interrupts();
     printk("enabled!\n");
 
@@ -72,29 +85,35 @@ void notmain() {
 
     // Q: what happens if you enable cache?  Why are some parts
     // the same, some change?
-    //enable_cache(); 	
+    // enable_cache();
     unsigned iter = 0, sum = 0;
-#   define N 20
-    while(cnt < N) {
+#define N 20
+    while (cnt < N)
+    {
         // Q: if you comment this out?  why do #'s change?
-        printk("iter=%d: cnt = %d, time between interrupts = %d usec (%x)\n", 
-                                    iter,cnt, period,period);
+        printk("iter=%d: cnt = %d, time between interrupts = %d usec (%x)\n",
+               iter, cnt, period, period);
         iter++;
+        // if you interrupt so infrequently, you will get a lot
+        // of iter / N.
+        // average period should be closed to your set period
+        // if commenting out the print, iter should go up as
+        // print also has its own overhead.
     }
 
     // overly complicated calculation of sec/ms/usec breakdown
     // make it easier to tell the overhead of different changes.
     // not really specific to interrupt handling.
     unsigned tot = timer_get_usec() - start,
-             tot_sec    = tot / (1000*1000),
-             tot_ms     = (tot / 1000) % 1000,
-             tot_usec   = (tot % 1000);
+             tot_sec = tot / (1000 * 1000),
+             tot_ms = (tot / 1000) % 1000,
+             tot_usec = (tot % 1000);
     printk("-----------------------------------------\n");
     printk("summary:\n");
     printk("\t%d: total iterations\n", iter);
     printk("\t%d: tot interrupts\n", N);
-    printk("\t%d: iterations / interrupt\n", iter/N);
-    printk("\t%d: average period\n\n", period_sum/(N-1));
-    printk("total execution time: %dsec.%dms.%dusec\n", 
-                    tot_sec, tot_ms, tot_usec);
+    printk("\t%d: iterations / interrupt\n", iter / N);
+    printk("\t%d: average period\n\n", period_sum / (N - 1));
+    printk("total execution time: %dsec.%dms.%dusec\n",
+           tot_sec, tot_ms, tot_usec);
 }
