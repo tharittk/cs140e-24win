@@ -95,7 +95,12 @@ software_interrupt_asm:
     @   - call
     @   - restore regs
     @   - return from the exception.
-    asm_not_implemented()
+    
+    push {r1-r12, lr}
+    mov r1, r0      @ syscall argument
+    sub r0, lr, #4  @ get swi, lr points to instruction following the swi
+    bl syscall_vector
+    pop {r1-r12, lr} @ r0 should hold return from syscall
     movs pc, lr
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
