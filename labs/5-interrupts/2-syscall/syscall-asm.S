@@ -3,7 +3,7 @@
 MK_FN(syscall_hello)
     @ we are already at system level: running this will trash
     @ the lr, so we need to save it.
-    push {lr}
+    push {lr} @ need to do this as you may currently be inside the other function, swi overwrite this lr to instruction after swi
     swi 1
     pop {lr}
     bx lr
@@ -25,4 +25,7 @@ MK_FN(syscall_illegal)
 @
 @ does not return
 MK_FN(run_user_code_asm)
-    asm_not_implemented()
+    msr cpsr, #(0b10000 | (1<<7))
+    prefetch_flush(r2)
+    mov sp, r1      @ alias for banked r13
+    blx r0

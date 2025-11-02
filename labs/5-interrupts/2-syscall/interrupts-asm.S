@@ -118,3 +118,28 @@ prefetch_abort_asm:
 data_abort_asm:
   sub   lr, lr, #4
   bl    data_abort_vector
+
+
+@@@@
+.globl _int_table_user
+.globl _int_table_user_end
+_int_table_user:
+  ldr pc, _reset_asm
+  ldr pc, _undefined_instruction_asm
+  ldr pc, _software_interrupt_user_asm @ only one that changes
+  ldr pc, _prefetch_abort_asm
+  ldr pc, _data_abort_asm
+  ldr pc, _reset_asm
+  ldr pc, _interrupt_asm
+
+_int_table_user_end:
+
+_software_interrupt_user_asm:      .word software_interrupt_user_asm
+
+software_interrupt_user_asm:
+    push {r1-r12, lr}
+    mov r1, r0      @ syscall argument
+    sub r0, lr, #4  @ get swi, lr points to instruction following the swi
+    bl syscall_vector
+    pop {r1-r12, lr} @ r0 should hold return from syscall
+    movs pc, lr
