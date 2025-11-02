@@ -27,19 +27,27 @@
 // allocate table.
 //    few lines of code
 static uint32_t *table;
+// static uint32_t code_size_words;
 static uint32_t code_size_bytes;
+static uint32_t num_instructions;
 static unsigned gprof_init(void) {
-  code_size_bytes = (__code_end__ - __code_start__) * 4;
-  table = (uint32_t *)kmalloc(code_size_bytes);
-  for (int i = 0; i < code_size_bytes / 4; ++i) {
-    table[i] = 0;
-  }
+  // Because these symbols are defined as uint32_t* (in memmap.h), the
+  // difference of 1 means 32-bit slot. [_s_] [ ] [ ] [ ] [++_s_]
+  // so __code_end__ - __code_start__ returns the **count of 32-bit word** not
+  // bytes i.e., it is pointer arithmatic
+
+  code_size_bytes = (uint32_t)__code_end__ - (uint32_t)__code_start__;
+  // code_size_words = __code_end__ - __code_start__; /* pointer arithmatic */
+  num_instructions = code_size_bytes / 4;
+  table = (uint32_t *)kmalloc(num_instructions * sizeof(uint32_t));
+  memset(table, 0, num_instructions * sizeof(uint32_t));
   return 0;
 }
 
 // increment histogram associated w/ pc.
 //    few lines of code
 static void gprof_inc(unsigned pc) {
+  /* raw address computation, need div by 4 */
   unsigned index = ((uint32_t)pc - (uint32_t)__code_start__) / 4;
   ++table[index];
 }
@@ -47,10 +55,9 @@ static void gprof_inc(unsigned pc) {
 // print out all samples whose count > min_val
 //
 // make sure sampling does not pick this code up!
-#define arm_timer_Control 0x2000B408
 static void gprof_dump(unsigned min_val) {
   printk("---\n");
-  for (int i = 0; i < code_size_bytes / 4; ++i) {
+  for (int i = 0; i < num_instructions; i++) {
     if (table[i] > min_val) {
       uint32_t addr = (uint32_t)__code_start__ + i * 4;
       printk("pc at %x : %d \n", addr, table[i]);
