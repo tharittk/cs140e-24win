@@ -35,9 +35,9 @@ static unsigned gprof_init(void) {
   // difference of 1 means 32-bit slot. [_s_] [ ] [ ] [ ] [++_s_]
   // so __code_end__ - __code_start__ returns the **count of 32-bit word** not
   // bytes i.e., it is pointer arithmatic
-
   code_size_bytes = (uint32_t)__code_end__ - (uint32_t)__code_start__;
   // code_size_words = __code_end__ - __code_start__; /* pointer arithmatic */
+
   num_instructions = code_size_bytes / 4;
   table = (uint32_t *)kmalloc(num_instructions * sizeof(uint32_t));
   memset(table, 0, num_instructions * sizeof(uint32_t));
@@ -46,7 +46,12 @@ static unsigned gprof_init(void) {
 
 // increment histogram associated w/ pc.
 //    few lines of code
+
+static void gprof_dump(unsigned min_val);
+extern char gprof_dump_end;
 static void gprof_inc(unsigned pc) {
+  if (pc >= (uint32_t)gprof_dump && pc < (uint32_t)gprof_dump_end)
+    return;
   /* raw address computation, need div by 4 */
   unsigned index = ((uint32_t)pc - (uint32_t)__code_start__) / 4;
   ++table[index];
@@ -63,12 +68,12 @@ static void gprof_dump(unsigned min_val) {
       printk("pc at %x : %d \n", addr, table[i]);
     }
   }
+  asm volatile(".global gprof_dump_end\n gprof_dump_end:");
 }
 
 /***********************************************************************
  * timer interrupt code from before, now calls gprof update.
  */
-// Q: if you make not volatile?
 static volatile unsigned cnt;
 static volatile unsigned period;
 
@@ -85,8 +90,6 @@ void interrupt_vector(unsigned pc) {
    * Clear the ARM Timer interrupt - it's the only interrupt we have
    * enabled, so we want don't have to work out which interrupt source
    * caused us to interrupt
-   *
-   * Q: if we delete?
    */
   PUT32(arm_timer_IRQClear, 1);
   cnt++;
@@ -99,8 +102,6 @@ void interrupt_vector(unsigned pc) {
   unsigned clk = timer_get_usec();
   period = last_clk ? clk - last_clk : 0;
   last_clk = clk;
-
-  // Q: if we put a print statement?
 }
 
 // trivial program to test gprof implementation.
@@ -127,11 +128,11 @@ void notmain() {
 
   // caches_enable(); 	// Q: what happens if you enable cache?
   unsigned iter = 0;
-  while (cnt < 200) {
+  while (cnt < 100) {
     // printk("iter=%d: cnt = %d, period = %dusec, %x\n", iter, cnt, period,
     //    period);
     iter++;
-    if (iter % 10 == 0)
+    if (iter % 2000 == 0)
       gprof_dump(2);
   }
   clean_reboot();
