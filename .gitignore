@@ -16,3 +16,8 @@ staff
 *.out*
 *.o*
 *.a*
+
+*.bin*
+*.elf*
+*.list*
+*.fake*
