@@ -126,15 +126,13 @@ data_abort_asm:
 _int_table_user:
   ldr pc, _reset_asm
   ldr pc, _undefined_instruction_asm
-  ldr pc, _software_interrupt_user_asm @ only one that changes
+  ldr pc, _software_interrupt_user_asm
   ldr pc, _prefetch_abort_asm
   ldr pc, _data_abort_asm
   ldr pc, _reset_asm
   ldr pc, _interrupt_asm
-
-_int_table_user_end:
-
 _software_interrupt_user_asm:      .word software_interrupt_user_asm
+_int_table_user_end:
 
 software_interrupt_user_asm:
     push {r1-r12, lr}

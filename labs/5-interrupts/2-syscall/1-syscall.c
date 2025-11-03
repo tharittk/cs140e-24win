@@ -50,8 +50,6 @@ void user_fn(void) {
   uint64_t var;
 
   trace("checking that stack got switched\n");
-  output("stack[0] %p \n", &stack[0]);
-  output("stack[N] %p \n", &stack[N]);
   assert(&var >= &stack[0]);
   assert(&var < &stack[N]);
 
@@ -77,7 +75,6 @@ void user_fn(void) {
 int syscall_vector(unsigned pc, uint32_t r0) {
   uint32_t inst, sys_num, mode;
 
-  //   todo("get <spsr> and check that mode bits = USER level\n");
   mode = spsr_get() & (0b11111);
   inst = *(uint32_t *)pc;
   sys_num = inst & (~0xff000000); // extract lower 24 bits
@@ -103,19 +100,6 @@ int syscall_vector(unsigned pc, uint32_t r0) {
 }
 
 void notmain() {
-  //   todo("use int_init_vec to install vector with a different swi handler");
-
-#if 0
-    // you'll have to define these two symbols: swi instructions
-    // should get routed to <syscall_vector>
-    extern uint32_t _int_table_user[], _int_table_user_end[];
-    int_init_vec(_int_table_user, _int_table_user_end);
-#endif
-  //   todo("define int_table_user interrupts-asm.S: should set stack
-  //   pointer!");
-
-  //   todo("set <sp> to a reasonable stack address in <stack>");
-
   extern uint32_t _int_table_user[], _int_table_user_end[];
   int_init_vec(_int_table_user, _int_table_user_end);
   // 32 k (elements) - there are 64
