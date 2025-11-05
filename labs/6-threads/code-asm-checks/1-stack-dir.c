@@ -7,12 +7,20 @@
 //     compiler didn't optimize the calls away.
 #include "rpi.h"
 
-int stack_grows_down(void) {
-    todo("implement this routine\n");
+int stack_grows_down(void)
+{
+    int local = 1;
+    int addr(int *local)
+    {
+        int local2 = 2;
+        return local > &local2;
+    }
+    return addr(&local);
 }
 
-void notmain(void) {
-    if(stack_grows_down())
+void notmain(void)
+{
+    if (stack_grows_down())
         trace("stack grows down\n");
     else
         trace("stack grows up\n");
