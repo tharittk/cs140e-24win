@@ -9,9 +9,13 @@
 # 
 # return the pointer value after.
 #
-# note: don't trash the sp!
+# note: don't trash the sp! -- real pain
 MK_FN(push_one)
-    asm_todo("implement this!")
+    mov r2, sp @ save sp
+    mov sp, r0 @ fake sp
+    push {r1}
+    mov r0, sp
+    mov sp, r2 @ restore actual sp otherwise you go back with different sp - and things break
     bx lr
 
 
@@ -20,6 +24,11 @@ MK_FN(push_one)
 #
 # note: don't trash the sp!
 MK_FN(push_two)
+    mov r3, sp @ save sp
+    mov sp, r0 @ fake sp
+    push {r1, r2}
+    mov r0, sp
+    mov sp, r3
     bx lr
 
 MK_FN(check_push_asm)
