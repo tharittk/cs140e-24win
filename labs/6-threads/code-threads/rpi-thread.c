@@ -101,6 +101,13 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg)
     // write this so that it calls code,arg.
     void rpi_init_trampoline(void);
 
+    // after pop {r..r, lr}, bx lr in asm jumps to execute it
+    // store the *address* (value of those vars i.e., uint32_t because those vars are ptr)
+    // their values hold the address.
+    t->stack[LR_OFFSET] = (uint32_t)rpi_init_trampoline;
+    t->stack[R4_OFFSET] = (uint32_t)code;
+    t->stack[R5_OFFSET] = (uint32_t)arg;
+
     /*
      * must do the "brain surgery" (k.thompson) to set up the stack
      * so that when we context switch into it, the code will be
@@ -170,20 +177,31 @@ void rpi_thread_start(void)
         goto end;
 
     // setup scheduler thread block.
+
     if (!scheduler_thread)
         scheduler_thread = th_alloc();
+
+    // maybe not needed
+    scheduler_thread->saved_sp = &scheduler_thread->stack[0];
 
     while (!Q_empty(&runq))
     {
         // remove in FIFO manner
+        rpi_thread_t *old_thread = cur_thread;
         cur_thread = Q_pop(&runq);
 
+        // context switch
+        rpi_cswitch(/* old saved sp*/ &old_thread->saved_sp, /*new sp */ cur_thread->saved_sp);
+
         // call the function of that thread
-        cur_thread->fn(cur_thread->arg);
+        // cur_thread->fn(cur_thread->arg);
 
         // free that thread block
         th_free(cur_thread);
     }
+
+    // switch back to the dummy scheduler_thread
+    rpi_cswitch(&cur_thread->saved_sp, scheduler_thread->saved_sp);
 
     goto end;
 

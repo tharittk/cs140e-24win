@@ -15,7 +15,7 @@
 
 
 # set this to 1 if you want the programs to run automatically.
-RUN=1
+RUN=0
 
 # switch these when implemented.
 COMMON_SRC += rpi-thread-asm.S 
