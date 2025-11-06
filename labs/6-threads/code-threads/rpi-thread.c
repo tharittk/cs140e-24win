@@ -115,14 +115,22 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg)
     // after pop {r..r, lr}, bx lr in asm jumps to execute it
     // store the *address* (value of those vars i.e., uint32_t because those vars are ptr)
     // their values hold the address.
-    t->stack[LR_OFFSET] = (uint32_t)rpi_init_trampoline;
-    t->stack[R4_OFFSET] = (uint32_t)code;
-    t->stack[R5_OFFSET] = (uint32_t)arg;
 
     t->fn = code;
     t->arg = arg;
-    t->saved_sp = &t->stack[0];
 
+    uint32_t *stack_top = &t->stack[THREAD_MAXSTACK];
+    stack_top -= 9; // rooms for r4-11, lr
+    // [r4] <- stack top (lower addr)
+    // [r5]
+    // ..
+    // [lr]             (higer addr)
+    // push: decrement & write
+    // pop : read & increment
+    stack_top[LR_OFFSET] = (uint32_t)rpi_init_trampoline;
+    stack_top[R4_OFFSET] = (uint32_t)code;
+    stack_top[R5_OFFSET] = (uint32_t)arg;
+    t->saved_sp = stack_top;
     th_trace("rpi_fork: tid=%d, code=[%p], arg=[%x], saved_sp=[%p]\n", t->tid,
              code, arg, t->saved_sp);
 
@@ -184,7 +192,7 @@ void rpi_thread_start(void)
         scheduler_thread = th_alloc();
 
     // maybe not needed
-    scheduler_thread->saved_sp = &scheduler_thread->stack[0];
+    scheduler_thread->saved_sp = &scheduler_thread->stack[THREAD_MAXSTACK];
 
     cur_thread = scheduler_thread;
 
@@ -194,7 +202,6 @@ void rpi_thread_start(void)
         rpi_thread_t *old_thread = cur_thread;
         rpi_thread_t *t = Q_pop(&runq);
         cur_thread = t;
-        trace("current thread tid: %d @[%p] \n", t->tid, t);
 
         // context switch
         rpi_cswitch(/* old saved sp*/ &old_thread->saved_sp, /*new sp */ t->saved_sp);
