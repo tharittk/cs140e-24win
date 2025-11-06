@@ -15,7 +15,7 @@
 
 
 # set this to 1 if you want the programs to run automatically.
-RUN=0
+RUN=1
 
 # switch these when implemented.
 COMMON_SRC += rpi-thread-asm.S 
@@ -41,7 +41,8 @@ STAFF_OBJS += staff-kmalloc.o
 
 # PROGS = $(wildcard ./1-test*.c)
 # PROGS = 1-test-run-one.c
-PROGS = 1-test-run-N.c
+# PROGS = 1-test-run-N.c
+PROGS = 4-test-one-fork.c
 
 ######################################################################
 # should not have to modify below.

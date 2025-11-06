@@ -101,13 +101,6 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg)
     // write this so that it calls code,arg.
     void rpi_init_trampoline(void);
 
-    // after pop {r..r, lr}, bx lr in asm jumps to execute it
-    // store the *address* (value of those vars i.e., uint32_t because those vars are ptr)
-    // their values hold the address.
-    t->stack[LR_OFFSET] = (uint32_t)rpi_init_trampoline;
-    t->stack[R4_OFFSET] = (uint32_t)code;
-    t->stack[R5_OFFSET] = (uint32_t)arg;
-
     /*
      * must do the "brain surgery" (k.thompson) to set up the stack
      * so that when we context switch into it, the code will be
@@ -118,8 +111,17 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg)
      *  3. store the address of rpi_init_trampoline into the lr
      *     position so context switching will jump there.
      */
+
+    // after pop {r..r, lr}, bx lr in asm jumps to execute it
+    // store the *address* (value of those vars i.e., uint32_t because those vars are ptr)
+    // their values hold the address.
+    t->stack[LR_OFFSET] = (uint32_t)rpi_init_trampoline;
+    t->stack[R4_OFFSET] = (uint32_t)code;
+    t->stack[R5_OFFSET] = (uint32_t)arg;
+
     t->fn = code;
     t->arg = arg;
+    t->saved_sp = &t->stack[0];
 
     th_trace("rpi_fork: tid=%d, code=[%p], arg=[%x], saved_sp=[%p]\n", t->tid,
              code, arg, t->saved_sp);
@@ -184,24 +186,25 @@ void rpi_thread_start(void)
     // maybe not needed
     scheduler_thread->saved_sp = &scheduler_thread->stack[0];
 
+    cur_thread = scheduler_thread;
+
     while (!Q_empty(&runq))
     {
         // remove in FIFO manner
         rpi_thread_t *old_thread = cur_thread;
-        cur_thread = Q_pop(&runq);
+        rpi_thread_t *t = Q_pop(&runq);
+        cur_thread = t;
+        trace("current thread tid: %d @[%p] \n", t->tid, t);
 
         // context switch
-        rpi_cswitch(/* old saved sp*/ &old_thread->saved_sp, /*new sp */ cur_thread->saved_sp);
-
-        // call the function of that thread
-        // cur_thread->fn(cur_thread->arg);
-
+        rpi_cswitch(/* old saved sp*/ &old_thread->saved_sp, /*new sp */ t->saved_sp);
+        // th_trace("back \n");
         // free that thread block
-        th_free(cur_thread);
+        // th_free(t);
     }
 
     // switch back to the dummy scheduler_thread
-    rpi_cswitch(&cur_thread->saved_sp, scheduler_thread->saved_sp);
+    // rpi_cswitch(&cur_thread->saved_sp, scheduler_thread->saved_sp);
 
     goto end;
 
@@ -228,7 +231,7 @@ void rpi_print_regs(uint32_t *sp)
     for (unsigned i = 0; i < 9; i++)
     {
         unsigned r = i == 8 ? 14 : i + 4;
-        printk("sp[%d]=r%d=%x\n", i, r, sp[i]);
+        printk("sp[%d]=r%d=%x (addr: %x) \n", i, r, sp[i], &sp[i]);
     }
     clean_reboot();
 }
