@@ -37,12 +37,12 @@ STAFF_OBJS += staff-kmalloc.o
 # PROGS = $(wildcard ./1-test*.c)
 
 # all the tests.  
-# PROGS = $(wildcard ./[234567]-test*.c)
+PROGS = $(wildcard ./[1234567]-test*.c)
 
 # PROGS = $(wildcard ./1-test*.c)
 # PROGS = 1-test-run-one.c
 # PROGS = 1-test-run-N.c
-PROGS = 4-test-one-fork.c
+# PROGS = 7-test-realtime-yield.c
 
 ######################################################################
 # should not have to modify below.

@@ -10,9 +10,9 @@ static void thread_code(void *arg)
     rpi_thread_t *t = rpi_cur_thread();
 
     // actually i think the thread pointer should be same?
-    trace("in thread [%p], tid=%d with x=%x @ [%p]\n", t, t->tid, *x, t);
-
+    trace("in thread [%p], tid=%d with x=%d\n", t, t->tid, *x);
     assert(t->tid == 1 && *x == 0xdeadbeef);
+
     trace("SUCCESS: got to the first thread: rebooting\n");
     clean_reboot();
 }

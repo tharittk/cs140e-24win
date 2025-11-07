@@ -184,11 +184,12 @@ void rpi_yield(void)
     // if you switch, print the statement:
     rpi_thread_t *old, *next;
     old = cur_thread;
-    next = Q_pop(&runq);
 
-    th_trace("switching from tid=%d to tid=%d\n", old->tid, next->tid);
     // put the current back to the end of the queue
-    Q_push(&runq, old);
+    // need to do this before pop because it sets next pointer
+    Q_append(&runq, old);
+    next = Q_pop(&runq);
+    th_trace("switching from tid=%d to tid=%d\n", old->tid, next->tid);
     cur_thread = next;
     rpi_cswitch(&old->saved_sp, next->saved_sp);
 }
