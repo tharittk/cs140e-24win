@@ -146,7 +146,7 @@ void rpi_exit(int exitcode)
 {
     redzone_check(0);
 
-    rpi_thread_t *old, next;
+    rpi_thread_t *old, *next;
     old = rpi_cur_thread();
     if (old->next)
     {
@@ -182,12 +182,13 @@ void rpi_yield(void)
     }
 
     // if you switch, print the statement:
-    rpi_thread_t *old, next;
+    rpi_thread_t *old, *next;
+    old = cur_thread;
     next = Q_pop(&runq);
 
     th_trace("switching from tid=%d to tid=%d\n", old->tid, next->tid);
     // put the current back to the end of the queue
-    Q_push(old);
+    Q_push(&runq, old);
     cur_thread = next;
     rpi_cswitch(&old->saved_sp, next->saved_sp);
 }

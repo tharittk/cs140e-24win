@@ -16,7 +16,7 @@ MK_FN(rpi_cswitch)
     str sp, [r0]        @ sp of old thread
     mov sp, r1          @ sp of new thread
     pop {r4-r11, lr}    @ load registers of the new thread block
-    blx lr               @ go to rpi_init_trampoline
+    blx lr              @ go to rpi_init_trampoline
 
 
 @ [Make sure you can answer: why do we need to do this?]
@@ -32,5 +32,7 @@ MK_FN(rpi_init_trampoline)
     mov r1, r4          @ code (moved in rpi_fork)
     blx r1
 
+    @ in case the thread does not call rpi_exit
+    @ the pop {... pc} will make a jump back here i.e., mov pc, lr
     mov r0, #0
     bl rpi_exit
