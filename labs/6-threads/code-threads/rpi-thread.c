@@ -146,10 +146,21 @@ void rpi_exit(int exitcode)
 {
     redzone_check(0);
 
-    // when you switch back to the scheduler thread:
-    //      th_trace("done running threads, back to scheduler\n");
-    panic("not implement rpi_exit yet \n");
-
+    rpi_thread_t *old, next;
+    old = rpi_cur_thread();
+    if (old->next)
+    {
+        next = old->next;
+        Q_pop(&runq);
+    }
+    else
+    {
+        th_trace("done running threads, back to scheduler\n");
+        next = scheduler_thread;
+    }
+    th_free(old);
+    cur_thread = next;
+    rpi_cswitch(&old->saved_sp, next->saved_sp);
     // should never return.
     not_reached();
 }
@@ -164,10 +175,21 @@ void rpi_exit(int exitcode)
 void rpi_yield(void)
 {
     redzone_check(0);
-    // if you switch, print the statement:
-    //     th_trace("switching from tid=%d to tid=%d\n", old->tid, t->tid);
 
-    todo("implement the rest of rpi_yield");
+    if (Q_empty(&runq))
+    {
+        return;
+    }
+
+    // if you switch, print the statement:
+    rpi_thread_t *old, next;
+    next = Q_pop(&runq);
+
+    th_trace("switching from tid=%d to tid=%d\n", old->tid, next->tid);
+    // put the current back to the end of the queue
+    Q_push(old);
+    cur_thread = next;
+    rpi_cswitch(&old->saved_sp, next->saved_sp);
 }
 
 /*
@@ -194,24 +216,18 @@ void rpi_thread_start(void)
     // maybe not needed
     scheduler_thread->saved_sp = &scheduler_thread->stack[THREAD_MAXSTACK];
 
-    cur_thread = scheduler_thread;
-
-    while (!Q_empty(&runq))
+    if (!Q_empty(&runq))
     {
         // remove in FIFO manner
-        rpi_thread_t *old_thread = cur_thread;
-        rpi_thread_t *t = Q_pop(&runq);
-        cur_thread = t;
+        rpi_thread_t *next = Q_pop(&runq);
+        cur_thread = next;
 
         // context switch
-        rpi_cswitch(/* old saved sp*/ &old_thread->saved_sp, /*new sp */ t->saved_sp);
-        // th_trace("back \n");
-        // free that thread block
-        // th_free(t);
+        rpi_cswitch(/*old saved sp*/ &scheduler_thread->saved_sp, /*new sp*/ next->saved_sp);
     }
 
-    // switch back to the dummy scheduler_thread
-    // rpi_cswitch(&cur_thread->saved_sp, scheduler_thread->saved_sp);
+    // must be scheduler_thread
+    assert(cur_thread->tid == scheduler_thread->tid);
 
     goto end;
 
