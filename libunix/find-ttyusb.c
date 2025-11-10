@@ -43,8 +43,8 @@ int compare_mtime_less(const struct dirent **a, const struct dirent **b) {
     // struct stat* stat_a = (struct stat*) malloc (sizeof(struct stat));
     char path_a[PATH_MAX], path_b[PATH_MAX];
 
-    snprintf(path_a, PATH_MAX, "./%s", (*a)->d_name);
-    snprintf(path_b, PATH_MAX, "./%s", (*b)->d_name);
+    snprintf(path_a, PATH_MAX, "/dev/%s", (*a)->d_name);
+    snprintf(path_b, PATH_MAX, "/dev/%s", (*b)->d_name);
 
     if (stat(path_a, stat_a) == -1 || stat(path_b, stat_b) == -1) {
         return 0;
@@ -70,8 +70,8 @@ int compare_mtime_greater(const struct dirent **a, const struct dirent **b) {
     // struct stat* stat_a = (struct stat*) malloc (sizeof(struct stat));
     char path_a[PATH_MAX], path_b[PATH_MAX];
 
-    snprintf(path_a, PATH_MAX, "./%s", (*a)->d_name);
-    snprintf(path_b, PATH_MAX, "./%s", (*b)->d_name);
+    snprintf(path_a, PATH_MAX, "/dev/%s", (*a)->d_name);
+    snprintf(path_b, PATH_MAX, "/dev/%s", (*b)->d_name);
 
     if (stat(path_a, stat_a) == -1 || stat(path_b, stat_b) == -1) {
         return 0;
