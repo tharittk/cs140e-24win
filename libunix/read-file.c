@@ -28,11 +28,13 @@ void *read_file(unsigned *size, const char *name) {
     //    - make sure any padding bytes have zeros.
     //    - return it.   
     char* buf;
-    struct stat* s = (struct stat*) malloc (sizeof(struct stat));
-    stat(name, s);
-    *size = s->st_size;
+    struct stat s;
+    // struct stat* s = (struct stat*) malloc (sizeof(struct stat));
 
-    unsigned padded_size = 4 * ((s->st_size + 3) / 4);
+    stat(name, &s);
+    *size = s.st_size;
+
+    unsigned padded_size = 4 * ((s.st_size + 3) / 4);
     buf = (char*) calloc (padded_size, sizeof(char));
     if (!buf){
         trace("calloc error for buf \n");
@@ -46,7 +48,6 @@ void *read_file(unsigned *size, const char *name) {
     }
     read(fd, buf, *size);
     close(fd);
-    free(s);
 
     return buf;
 

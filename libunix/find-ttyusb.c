@@ -38,57 +38,46 @@ enum OPTION {
 
 // Custom comparison function for scandir
 int compare_mtime_less(const struct dirent **a, const struct dirent **b) {
-    struct stat* stat_a = (struct stat*) malloc (sizeof(struct stat));
-    struct stat* stat_b = (struct stat*) malloc (sizeof(struct stat));
+    struct stat stat_a, stat_b;
     // struct stat* stat_a = (struct stat*) malloc (sizeof(struct stat));
     char path_a[PATH_MAX], path_b[PATH_MAX];
 
     snprintf(path_a, PATH_MAX, "/dev/%s", (*a)->d_name);
     snprintf(path_b, PATH_MAX, "/dev/%s", (*b)->d_name);
 
-    if (stat(path_a, stat_a) == -1 || stat(path_b, stat_b) == -1) {
+    if (stat(path_a, &stat_a) == -1 || stat(path_b, &stat_b) == -1) {
         return 0;
     }
 
     int ret;
-    if (stat_a->st_mtime < stat_b->st_mtime) {
-        ret = 1; // a is older
-    } else if (stat_a->st_mtime > stat_b->st_mtime) {
-        ret = -1;  // a is newer
+    if (stat_a.st_mtime < stat_b.st_mtime) {
+        return 1; // a is older
+    } else if (stat_a.st_mtime > stat_b.st_mtime) {
+        return -1;  // a is newer
     } else {
-        ret = 0;  // Same modification time
+        return 0;  // Same modification time
     }
-
-    free(stat_a);
-    free(stat_b);
-    return ret;
 }
 
 int compare_mtime_greater(const struct dirent **a, const struct dirent **b) {
-    struct stat* stat_a = (struct stat*) malloc (sizeof(struct stat));
-    struct stat* stat_b = (struct stat*) malloc (sizeof(struct stat));
-    // struct stat* stat_a = (struct stat*) malloc (sizeof(struct stat));
+    struct stat stat_a, stat_b;
     char path_a[PATH_MAX], path_b[PATH_MAX];
 
     snprintf(path_a, PATH_MAX, "/dev/%s", (*a)->d_name);
     snprintf(path_b, PATH_MAX, "/dev/%s", (*b)->d_name);
 
-    if (stat(path_a, stat_a) == -1 || stat(path_b, stat_b) == -1) {
+    if (stat(path_a, &stat_a) == -1 || stat(path_b, &stat_b) == -1) {
         return 0;
     }
 
     int ret;
-    if (stat_a->st_mtime < stat_b->st_mtime) {
-        ret = -1; // a is older
-    } else if (stat_a->st_mtime > stat_b->st_mtime) {
-        ret = 1;  // a is newer
+    if (stat_a.st_mtime < stat_b.st_mtime) {
+        return -1; // a is older
+    } else if (stat_a.st_mtime > stat_b.st_mtime) {
+        return 1;  // a is newer
     } else {
-        ret = 0;  // Same modification time
+        return 0;  // Same modification time
     }
-
-    free(stat_a);
-    free(stat_b);
-    return ret;
 }
 char* wrap_find_ttyusb(enum OPTION op){
     const char* parent_dir = "/dev";
