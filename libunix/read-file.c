@@ -27,5 +27,23 @@ void *read_file(unsigned *size, const char *name) {
     //    - fclose() the file descriptor
     //    - make sure any padding bytes have zeros.
     //    - return it.   
-    unimplemented();
+    char* buf;
+    struct stat* s = (struct stat*) malloc (sizeof(struct stat));
+    stat(name, s);
+    *size = s->st_size;
+
+    unsigned padded_size = 4 * ((s->st_size + 3) / 4);
+    buf = (char*) calloc (padded_size, sizeof(char));
+    // trace("Read %s, unpadded %llu, padded size %u \n", name, s->st_size, padded_size);
+    int fd = open(name, O_RDONLY);
+    if (fd == -1){
+        trace("Error opening file %s \n", name);
+        exit(1);
+    }
+    read(fd, buf, *size);
+    close(fd);
+
+    return buf;
+
+
 }
