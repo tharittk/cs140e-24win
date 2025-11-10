@@ -34,6 +34,10 @@ void *read_file(unsigned *size, const char *name) {
 
     unsigned padded_size = 4 * ((s->st_size + 3) / 4);
     buf = (char*) calloc (padded_size, sizeof(char));
+    if (!buf){
+        trace("calloc error for buf \n");
+        exit(1);
+    }
     // trace("Read %s, unpadded %llu, padded size %u \n", name, s->st_size, padded_size);
     int fd = open(name, O_RDONLY);
     if (fd == -1){
@@ -42,6 +46,7 @@ void *read_file(unsigned *size, const char *name) {
     }
     read(fd, buf, *size);
     close(fd);
+    free(s);
 
     return buf;
 
