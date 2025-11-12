@@ -115,8 +115,16 @@ boot_err(uint32_t error_opcode, const char *msg) {
 //     counter can overflow.
 static unsigned 
 has_data_timeout(unsigned timeout) {
-    boot_todo("has_data_timeout: implement this routine");
-    return 0;
+    // DO NOT do any put. You may flood the UART
+    // Polling for <timeout> period. If receive nothing, re-send GET_PROG_INFO
+    uint32_t start = timer_get_usec();
+    while (1){
+        if (uart_has_data())
+            return 1;
+        uint32_t now = timer_get_usec();
+        if ((now - start) >= timeout)
+            return 0;
+    }
 }
 
 // iterate:
@@ -137,7 +145,6 @@ static void wait_for_data(unsigned usec_timeout) {
         boot_put32(GET_PROG_INFO);
     } while(!has_data_timeout(usec_timeout));
     return;
-    boot_todo("wait_for_data: implement this routine");
 }
 
 // IMPLEMENT this routine.
@@ -155,7 +162,24 @@ uint32_t get_code(void) {
 
     // 2. expect: [PUT_PROG_INFO, addr, nbytes, cksum] 
     //    we echo cksum back in step 4 to help debugging.
-    boot_todo("wait for laptop/server response: echo checksum back");
+    // boot_todo("wait for laptop/server response: echo checksum back");
+
+    uint32_t put_prog_info = boot_get32();
+    uint32_t base_addr = boot_get32();
+    uint32_t nbytes = boot_get32();
+    uint32_t cksum = boot_get32();
+
+    // safe to check
+    char buf[100];
+    snprintk(buf, 100, "Confirm PUT_PROG_INFO %x \n", put_prog_info);
+    boot_putk(buf);
+    snprintk(buf, 100, "Confirm ARMBASE %x \n", base_addr);
+    boot_putk(buf);
+    snprintk(buf, 100, "Confirm nbytes %d \n", nbytes);
+    boot_putk(buf);
+    snprintk(buf, 100, "Confirm cksum %d \n", cksum);
+    boot_putk(buf);
+    
 
     // 3. If the binary will collide with us, abort with a BOOT_ERROR. 
     // 
@@ -170,26 +194,42 @@ uint32_t get_code(void) {
     //       - libpi/include/memmap.h
     //       - libpi/memmap 
     //    for definitions.
-    boot_todo("check that binary will not hit the bootloader code");
+
+    // boot-start.S reserves 0x20 0000 - 0x8004 for the received code
+    if (base_addr < 0x8000 || base_addr + nbytes >= 0x200000)
+        boot_err(BOOT_ERROR, "code collision detected \n");
 
     // 4. send [GET_CODE, cksum] back.
-    boot_todo("send [GET_CODE, cksum] back\n");
+    boot_put32(GET_CODE);
+    boot_put32(cksum);
 
     // 5. we expect: [PUT_CODE, <code>]
     //  read each sent byte and write it starting at 
     //  <addr> using PUT8
     //
     // common mistake: computing the offset incorrectly.
-    boot_todo("boot_get8() each code byte and use PUT8() to write it to memory");
+    uint32_t put_code = boot_get32();
+    addr = base_addr;
+    for (int i = 0; i < nbytes; i++){
+        uint8_t c = boot_get8();
+            PUT8(addr, c);
+            ++addr; // 32-bit
 
+    }
+    snprintk(buf, 100, "Confirm PUT_CODE %x \n", put_code);
+    boot_putk(buf);
     // 6. verify the cksum of the copied code using:
     //         boot-crc32.h:crc32.
     //    if fails, abort with a BOOT_ERROR.
-    boot_todo("verify the checksum of copied code");
+    uint32_t crc32_recv = crc32((uint8_t*)base_addr, nbytes);
+    if (crc32_recv != cksum){
+        snprintk(buf, 100, "computed cksum %x : expected %x \n", crc32_recv, cksum);
+        boot_putk(buf);
+        boot_err(BOOT_ERROR, "checksum of received code does not match\n");
+    }
 
     // 7. send back a BOOT_SUCCESS!
-    boot_putk("<PUT YOUR NAME HERE>: success: Received the program!");
-    boot_todo("fill in your name above");
+    boot_putk("<ThariT>: success: Received the program!");
 
     // woo!
     boot_put32(BOOT_SUCCESS);
