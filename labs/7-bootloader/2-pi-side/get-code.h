@@ -241,7 +241,8 @@ uint32_t get_code(void) {
     // to test multiple programs without it.
     // delay_ms(500);
     uart_flush_tx();
+    
 
-    return addr;
+    return base_addr;
 }
 #endif
