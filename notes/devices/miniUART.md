@@ -143,16 +143,52 @@ the errata!):
 
   0. Give three different register / fields to check if there is at least
      one byte in the RX FIFO.
+   ```
+      AUX_MU_IIR_REG 2:1 on read -> if 10 means RX holds valid bytes
+      AUX_MU_LSR_REG 0 -> check if RX holds at least one symbol
+      AUX_MU_STAT_REG 0 -> symbol available if set
+
+   ```
   1. Give three different register / fields to check if there is at
      least one byte of space in the TX FIFO.
+     AUX_MU_IIR_REG 2:1 on read -> if 01 means TX is empty
+     AUX_MU_LSR_REG 5 -> check if TX can accpet at least one byte
+     AUX_MU_STAT_REG 1 -> space availble if set
+
   2. Write the expression to read a byte from the RX FIFO (assume
      you don't have to check if data is there)
+     // check DLAB = 0 
+     assert((GET32(&MU->LCR) & (1 << 7)) == 0);
+     // get last 8 bits
+     unsigned data = GET32(&MU->IO) & (0xFF)
+
   3. Write the expression to write a byte to the TX FIFO  (assume you
      don't have to check if there is space for more data).
+     // check DLAB = 0 
+     assert((GET32(&MU->LCR) & (1 << 7)) == 0);
+     // write last 8 bit
+     // GET32 ... wrong because reading it will drain the value
+     // PUT32(&MU->IO,  (GET32(&MU->IO) & ~(0xFF)) | (data & (0xFF)));
+     // no mask required (i.e., no need to read-modify-write), the hardware ignore it
+     PUT32(&MU->IO, data & 0xFF);
+
   4. What value do you write to what register (and its address) to
      clear the RX and TX FIFOs?
+     // write to AUX_MU_IIR_REG
+     // bit 2 set will clear TX FIFO
+     // bit 1 set will clear RX FIFO
+     PUT32(&MU->IIR, 0b110);
+
   5. What register and value to write to set the UART data size to 8-bits.
+     // LCR at 0 bit
+     PUT32(&MU->LCR, GET32(&MU->LCR) | 0b1);
 
   6. Compute the value to write to the `AUX_MU_BAUD` register to set
      the UART baudrate to 115200.  Show your work solving for this value.
      Assume a 250Mhz clock (250,000,000 cycles per second).
+     // p.11
+     // 115,200 = (250e6) / (8 * (baud_reg + 1))
+     // baud_reg = (250e6 / (8*115200)) - 1;
+     // write this to AUX_MU_BAUD last 16-bit
+     // baud_reg ~ 270.267
+     PUT32(&MU->BAUD, 270);

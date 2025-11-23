@@ -427,3 +427,25 @@ Adding input is good.  Two issues:
      I'd have your code read until you see a start bit, delay `T/2` and then
      start sampling the data bits so that you are right in the center of 
      the bit transmission.
+
+---------------------------------------------------------------------
+Note from reading UART
+
+p9. AUXIRQ: bit 0 is to check whether UART has interrupt pending
+p9. AUXENB: bit 0 is to set if UART is enabled. Disabling also prevents read and write
+of associated registers ! Looks like I need to enabled this first (after gpio setup) -> then set control regs
+
+p10. gpio should be properly set-up before enabling UART. This looks like
+I should set pin 14, 15 (TX, RX) to high so that UART does not receive 0x00 at the beginning
+
+p11. AUX_MU_IO_REG: 7:0 (8bit) read (received FIFO) or write (transmit FIFO). You must check whether the fifo
+is empty or full prior to taking action
+
+p12. AUX_MU_IER_REG: bit@1 = assert the receiver FIFO interrupt. bit@0 = assert the transmit FIFO interrupt
+p13. AUX_MU_IIR_REG: bit 2:1, on read (currently, there is 1) no interrupt(00), transmit holding register empty, receiver holds valid byte. on write (bit @1 will clear receive FIFO, bit@2 will clear transmit FIFO)
+p14. AUX_MU_LCR_REG: bit 0: set 7 or 8-bit mode ! check errata (it is 2-bit field)
+p15. AUX_MU_LSR_REG: data status bit@5 if this bit is set, transmitter can accept at least 1-byte
+bit@0 is data ready (receive FIFO has only one byte) --- duplicate with STAT_REG ?
+p16-17. AUX_MU_CNTL_REG bit@1 transmitter enable, bit@0 receiver enable (write this after global AUXENB)
+p18. AUX_MU_STAT_REG: bit@1 if set, transmitter FIFO can accept at least one symbol, bit@0 if set, receiver FIFO contains at least one symbol. bit 27-24 | 19:16 it tells how many slots in FIFO are taken (4 bits - [0, 8])
+p18: AUX_MU_BAUD: 16bit baudrate (15:0)
