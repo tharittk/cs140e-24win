@@ -76,12 +76,13 @@ sw_uart_printk(sw_uart_t *s, const char *fmt, ...) {
        vsnprintk(buf, sizeof buf, fmt, args);
     va_end(args);
 
+
     sw_uart_putk(s, buf);
 }
 
 // we do using macros so gcc see's the constant used
 // in division: need b/c the arm has no divide.
-#define BAUD_TO_CYCLES(baud) ((700*1000*1000UL)/baud)
+#define BAUD_TO_CYCLES(baud) ((250*1000*1000UL)/baud)
 #define BAUD_TO_USEC(baud) ((1000*1000UL)/baud)
 
 // do division at the callsite so gcc can strength reduce.
