@@ -201,7 +201,7 @@ bitbang_uart_put8(sw_uart_t *sw, uint8_t byte) {
 // hacked setup to test a sw_uart implemntation
 void sw_uart_example(void) {
     unsigned baud = 115200;
-    unsigned ncycles = (250*1000*1000)/baud;
+    unsigned ncycles = (700*1000*1000)/baud;
 
     output("sw uart: cycles per bit=%d for baud=%d\n", ncycles, baud);
     time_log_init();

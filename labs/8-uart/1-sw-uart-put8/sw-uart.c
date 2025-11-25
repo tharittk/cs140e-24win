@@ -2,6 +2,7 @@
 #include "sw-uart.h"
 #include "cycle-count.h"
 #include "cycle-util.h"
+#include "wait-routines.h"
 
 #include <stdarg.h>
 
@@ -14,7 +15,22 @@ void sw_uart_put8(sw_uart_t *uart, uint8_t c) {
              u = n,
              s = cycle_cnt_read();
 
-    todo("implement this code\n");
+    // drop-in from bitbangging code
+    // trace("in put 8 init signal %c \n", c);
+    gpio_write(tx, 0); wait_ncycles_exact(s,u);  u +=n;
+
+    // the byte.
+    gpio_write(tx, (c>> 0)&1); wait_ncycles_exact(s, u);  u +=n;
+    gpio_write(tx, (c>> 1)&1); wait_ncycles_exact(s, u);  u +=n;
+    gpio_write(tx, (c>> 2)&1); wait_ncycles_exact(s, u);  u +=n;
+    gpio_write(tx, (c>> 3)&1); wait_ncycles_exact(s, u);  u +=n;
+    gpio_write(tx, (c>> 4)&1); wait_ncycles_exact(s, u);  u +=n;
+    gpio_write(tx, (c>> 5)&1); wait_ncycles_exact(s, u);  u +=n;
+    gpio_write(tx, (c>> 6)&1); wait_ncycles_exact(s, u);  u +=n;
+    gpio_write(tx, (c>> 7)&1); wait_ncycles_exact(s, u);  u +=n;
+
+    // stop bit (has to be 1 for at least n cycles)
+    gpio_write(tx, 1); wait_ncycles_exact(s,u); 
 }
 
 // do this second: you can type in pi-cat to send stuff.
@@ -23,6 +39,8 @@ void sw_uart_put8(sw_uart_t *uart, uint8_t c) {
 int sw_uart_get8_timeout(sw_uart_t *uart, uint32_t timeout_usec) {
     unsigned rx = uart->rx;
 
+    todo("implement this code\n");
+    // trace("sw_uart get8 timeout is called \n");
     // right away (used to be return never).
     while(!wait_until_usec(rx, 0, timeout_usec))
         return -1;
@@ -48,7 +66,15 @@ sw_uart_t sw_uart_init_helper(unsigned tx, unsigned rx,
         panic("too much diff: cyc_per_bit = %d * baud = %d\n", 
             cyc_per_bit, cyc_per_bit * baud);
 
-    todo("setup rx,tx and initial state of tx pin.");
+    // the sending signal start with pulling high -> low (handled by set function)
+    gpio_set_function(tx, GPIO_FUNC_OUTPUT);
+    // gpio_set_output(tx);
+    // pull-up only works for setting as an input pin
+    gpio_write(tx, 1);
+    gpio_set_function(rx, GPIO_FUNC_INPUT);
+    // gpio_set_input(rx);
+    gpio_set_pullup(rx);
+
 
     return (sw_uart_t) { 
             .tx = tx, 
