@@ -6,13 +6,13 @@ BOOTLOADER = my-install
 # BOOTLOADER = pi-install
 
 # set to 1 if you want to run.
-RUN=0
+RUN=1
 
 # we use a custom cstart
 COMMON_SRC := cstart.c uart.c
 
-PROGS = output-test-0-hello.c  
-# PROGS += output-test-1-hello-disable.c  
+# PROGS = output-test-0-hello.c  
+PROGS += output-test-1-hello-disable.c  
 # PROGS += output-test-3-emit.c
 
 # if doing checkoff use both uart and cstart.
