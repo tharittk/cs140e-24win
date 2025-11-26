@@ -3,7 +3,7 @@
 
 # swap these if your bootloader doesn't work.
 BOOTLOADER = my-install
-BOOTLOADER = pi-install
+# BOOTLOADER = pi-install
 
 # set to 1 if you want to run.
 RUN=0
@@ -12,8 +12,8 @@ RUN=0
 COMMON_SRC := cstart.c uart.c
 
 PROGS = output-test-0-hello.c  
-PROGS += output-test-1-hello-disable.c  
-PROGS += output-test-3-emit.c
+# PROGS += output-test-1-hello-disable.c  
+# PROGS += output-test-3-emit.c
 
 # if doing checkoff use both uart and cstart.
 ifdef CHECKOFF
