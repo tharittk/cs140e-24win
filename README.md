@@ -26,4 +26,7 @@ own simple, clean operating system for the widely-used, ARM-based
 - [x] Interrupt: BCM2835 Datasheet again, code trapping mechanism (ARM Assembly heavy)
 - [x] Thread: hand-roll a simple thread + context switch mechanism. Learn how to "brain surgey" through implementign `fork`
 - [x] Bootleader: Makes Unix + Pi talk. Sending code through UART.
+- [x] UART Driver: life was good when you have an access to `printk`. Now I cannot take it as given.
+
+
 Last updated @ November 13, 2025
