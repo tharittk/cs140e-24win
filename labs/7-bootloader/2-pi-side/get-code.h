@@ -229,7 +229,7 @@ uint32_t get_code(void) {
     }
 
     // 7. send back a BOOT_SUCCESS!
-    boot_putk("<ThariT>: success: Received the program!");
+    boot_putk("<ThariT with UART>: success: Received the program!");
 
     // woo!
     boot_put32(BOOT_SUCCESS);

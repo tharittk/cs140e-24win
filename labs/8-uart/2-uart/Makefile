@@ -9,15 +9,15 @@ BOOTLOADER = my-install
 RUN=1
 
 # we use a custom cstart
-COMMON_SRC := cstart.c uart.c
+COMMON_SRC := cstart.c
 
-# PROGS = output-test-0-hello.c  
+PROGS = output-test-0-hello.c  
 PROGS += output-test-1-hello-disable.c  
-# PROGS += output-test-3-emit.c
+PROGS += output-test-3-emit.c
 
 # if doing checkoff use both uart and cstart.
 ifdef CHECKOFF
-    COMMON_SRC = uart.c cstart.c
+    COMMON_SRC = cstart.c
     PROGS= $(wildcard output-test*.c)
 endif
 

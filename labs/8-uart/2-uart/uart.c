@@ -13,16 +13,10 @@
 //
 //
 #include "rpi.h"
-#include "sw-uart.h"
+// #include "sw-uart.h"
 
 #define AUX_IRQ  0x20215000
 #define AUX_ENB  0x20215004
-
-#define PUT32(x, y) PUT32((unsigned) x, y)
-#define GET32(x) GET32((unsigned) x)
-
-#define PUT8(x, y) PUT8((unsigned) x, y)
-#define GET8(x) GET8((unsigned) x)
 
 typedef struct {
     unsigned IO;
@@ -51,7 +45,7 @@ static int rx_pin = 15;
 void uart_init(void) {
     // sw_uart_t sw = sw_uart_default();
     // disable first because it is enabled by bootloader
-    PUT32(AUX_ENB, GET32(AUX_ENB) & ~1); // Clear bit 0 to disable AUX UART1
+    PUT32((unsigned) AUX_ENB, GET32((unsigned) (AUX_ENB))& ~1); // Clear bit 0 to disable AUX UART1
     dev_barrier();
 
     // set gpio pin, in sw uart, we set it as output and input pin.
@@ -60,31 +54,31 @@ void uart_init(void) {
     dev_barrier();
 
     // turn on the global enabler - do read-modify-write (protect SPIm)
-    PUT32(AUX_ENB, GET32(AUX_ENB) | 0b1);
+    PUT32((unsigned) AUX_ENB, GET32((unsigned) (AUX_ENB)) | 0b1);
     dev_barrier();
 
     // disable tx, rx
-    PUT32(&MU->CNTL, GET32(&MU->CNTL) & ~0b11); // Clear bits 0 and 1 to disable TX/RX
+    PUT32((unsigned) &MU->CNTL, GET32((unsigned)(&MU->CNTL)) & ~0b11); // Clear bits 0 and 1 to disable TX/RX
     dev_barrier();
 
     // clear FIFO state for both rx, tx
-    PUT32(&MU->IIR, 0b110); 
+    PUT32((unsigned) &MU->IIR, 0b110); 
     dev_barrier();
 
     // disable interrupt
-    PUT32(&MU->IER, GET32(&MU->IER) & ~(0b11)); // clear last two bit
+    PUT32((unsigned) &MU->IER, GET32((unsigned) (&MU->IER)) & ~(0b11)); // clear last two bit
     dev_barrier();
 
     // configure 115,200 baudrate, 8n1, using 250 Mhz clock
-    PUT32(&MU->BAUD, 270);
+    PUT32((unsigned) &MU->BAUD, 270);
     dev_barrier();
 
     // 8bit mode. !Errata. Must write 3 to do 8-bit mode (not 1)
-    PUT32(&MU->LCR, GET32(&MU->LCR) | 0b11);
+    PUT32((unsigned) &MU->LCR, GET32((unsigned) (&MU->LCR)) | 0b11);
     dev_barrier();
 
     // enable tx, rx
-    PUT32(&MU->CNTL, GET32(&MU->CNTL) | (0b11));
+    PUT32((unsigned) &MU->CNTL, GET32((unsigned) (&MU->CNTL)) | (0b11));
     dev_barrier();
     // sw_uart_printk(&sw, "end of init\n");
 }
@@ -96,13 +90,13 @@ void uart_disable(void) {
     while (!uart_tx_is_empty()){
         ;
     }
-    PUT32(AUX_ENB, GET32(AUX_ENB) & ~1); 
+    PUT32((unsigned) AUX_ENB, GET32((unsigned) (AUX_ENB)) & ~1); 
     dev_barrier();
 }
 
 int uart_can_get8(void){
     // Check LSR bit 0 (Data Ready)
-    return GET32(&MU->LSR) & 1;
+    return GET32((unsigned) (&MU->LSR))& 1;
 }
 
 // returns one byte from the rx queue, if needed
@@ -111,13 +105,17 @@ int uart_get8(void) {
     while (!uart_can_get8()) {
         ;
     }
-    return (int) GET8(&MU->IO);
+
+    unsigned v = GET32((unsigned)&MU->IO);
+    v &= 0xff;
+    return v;
+    // return (int) GET32((unsigned)&MU->IO);
 }
 
 // 1 = space to put at least one byte, 0 otherwise.
 int uart_can_put8(void) {
     // Check LSR bit 5 (Transmitter Empty)
-    return GET32(&MU->LSR) & (1 << 5);
+    return GET32((unsigned) (&MU->LSR)) & (1 << 5);
 }
 
 // put one byte on the tx qqueue, if needed, blocks
@@ -126,7 +124,10 @@ int uart_can_put8(void) {
 int uart_put8(uint8_t c) {
     while (!uart_can_put8())
         ;
-    PUT8(&MU->IO, c);
+    unsigned v = GET32((unsigned)&MU->IO);
+    v &= ~(0xff);
+    v |= c;
+    PUT32((unsigned)&MU->IO, v); 
     return 1;
 }
 
@@ -134,7 +135,8 @@ int uart_put8(uint8_t c) {
 
 // 1 = at least one byte on rx queue, 0 otherwise
 int uart_has_data(void) {
-    return uart_can_get8();
+    // return uart_can_get8();
+    return uart_can_put8();
 }
 
 // return -1 if no data, otherwise the byte.
@@ -147,7 +149,7 @@ int uart_get8_async(void) {
 // 1 = tx queue empty, 0 = not empty.
 int uart_tx_is_empty(void) {
     // both empty and idle
-    return GET32(&MU->LSR) & (1 << 6);
+    return GET32((unsigned) (&MU->LSR)) & (1 << 6);
 }
 
 // flush out all bytes in the uart --- we use this when 
