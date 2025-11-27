@@ -49,7 +49,6 @@ static int rx_pin = 15;
 //
 //  later: should add an init that takes a baud rate.
 void uart_init(void) {
-
     // sw_uart_t sw = sw_uart_default();
     // disable first because it is enabled by bootloader
     PUT32(AUX_ENB, GET32(AUX_ENB) & ~1); // Clear bit 0 to disable AUX UART1
@@ -73,23 +72,32 @@ void uart_init(void) {
     dev_barrier();
 
     // disable interrupt
-    // make sure DLAB == 0
     PUT32(&MU->IER, GET32(&MU->IER) & ~(0b11)); // clear last two bit
+    dev_barrier();
 
     // configure 115,200 baudrate, 8n1, using 250 Mhz clock
     PUT32(&MU->BAUD, 270);
+    dev_barrier();
 
-    // 8bit mode
+    // 8bit mode. !Errata. Must write 3 to do 8-bit mode (not 1)
     PUT32(&MU->LCR, GET32(&MU->LCR) | 0b11);
     dev_barrier();
 
     // enable tx, rx
     PUT32(&MU->CNTL, GET32(&MU->CNTL) | (0b11));
+    dev_barrier();
     // sw_uart_printk(&sw, "end of init\n");
 }
 
+int uart_tx_is_empty(void);
 // disable the uart.
 void uart_disable(void) {
+    // nasty bug ! you disable before the async transmission completes 
+    while (!uart_tx_is_empty()){
+        ;
+    }
+    PUT32(AUX_ENB, GET32(AUX_ENB) & ~1); 
+    dev_barrier();
 }
 
 int uart_can_get8(void){
