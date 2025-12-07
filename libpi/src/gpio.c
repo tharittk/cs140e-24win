@@ -18,7 +18,15 @@ enum
   gpio_set1 = (GPIO_BASE + 0x20),
   gpio_clr0 = (GPIO_BASE + 0x28),
   gpio_clr1 = (GPIO_BASE + 0x2C),
-  gpio_lev0 = (GPIO_BASE + 0x34)
+  gpio_lev0 = (GPIO_BASE + 0x34),
+
+  // lab 9: interrupt
+  gpio_eds0 = (GPIO_BASE + 0x40),
+  gpio_eds1 = (GPIO_BASE + 0x44),
+  gpio_ren0 = (GPIO_BASE + 0x4c),
+  gpio_ren1 = (GPIO_BASE + 0x50),
+  gpio_fen0 = (GPIO_BASE + 0x58),
+  gpio_fen1 = (GPIO_BASE + 0x5c)
 };
 
 void gpio_set_function(unsigned pin, gpio_func_t function)
@@ -85,4 +93,56 @@ int gpio_read(unsigned pin)
     return -1;
   uint32_t val = GET32(gpio_lev0);
   return DEV_VAL32((val >> pin) & 1);
+}
+
+// lab 9: interrupt
+static void or32(volatile void* addr, uint32_t val){
+    dev_barrier();
+    PUT32(addr, GET32(addr) | val);
+    dev_barrier();
+}
+
+static void OR32(uint32_t addr, uint32_t val){
+    or32((volatile void*) addr, val);
+}
+
+// BCM2835 p.97
+void gpio_int_rising_edge(unsigned pin) {
+    if (pin > 53)
+        return;
+    unsigned reg = pin < 32 ? gpio_ren0 : gpio_ren1;
+    OR32(reg, 1 << (pin % 32));
+}
+
+void gpio_int_falling_edge(unsigned int pin){
+    if (pin > 53)
+        return;
+    unsigned reg = pin < 32 ? gpio_fen0 : gpio_fen1;
+    OR32(reg, 1 << (pin % 32));
+}
+
+void gpio_event_detected(unsigned int pin){
+    if (pin > 53)
+        return;
+    unsigned reg = pin < 32 ? gpio_eds0 : gpio_eds1;
+    return GET32(reg) & (1 << (pin % 32));
+}
+
+void gpio_event_clear(unsigned int pin){
+    if (pin > 53)
+        return;
+    unsigned reg = pin < 32 ? gpio_eds0 : gpio_eds1;
+    OR32(reg, 1 << (pin % 32));
+}
+
+/* For later: just when thses stuffs are still in my head */
+// void enable_gpio_interrupt(unsigned pin){
+//     // BCM 2835 p.113
+//     unsigned bit = pin < 32 ?  GPIO_INT0 : GPIO_INT1;
+//     OR32(Enable_IRQs_2 ,1 << (bit % 32))
+// }
+
+int gpio_has_interrupt(void) {
+    // we can only get it from GPIO_INT0 according from the Lab write-up
+    return GET32(IRQ_pending_2) & (1 << (GPIO_INT0 % 32));
 }
