@@ -15,16 +15,16 @@
 @ have since there's no (1) saving/restoring of registers,
 @ (2) additional jumps or (3) sanity checking.
 @
-@ NOTE: we will trash SUPER mode's <lr> so the caller 
+@ NOTE: we will trash SUPER mode's <lr> so the caller
 @ has to push{lr}/pop{lr}
 @
 MK_FN(sys_plus1_handler)
     add r0, r0, #1
     movs pc, lr
 
-@ trivial "user-level" client callsite that invokes 
-@ <sys_plus1_handler> system call using a SWI 
-@ instruction. 
+@ trivial "user-level" client callsite that invokes
+@ <sys_plus1_handler> system call using a SWI
+@ instruction.
 @
 @ NOTE: we are running at SUPER level today, as is the SWI handler:
 @ thus we have to push{lr}/pop{lr} since otherwise the swi
@@ -39,7 +39,7 @@ MK_FN(sys_plus1)
     bx lr
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-@ original interrupt table from 
+@ original interrupt table from
 @    5-interrupts/0-timer-int:interrupt-asm.S
 @
 @ only change is that we call our sys_plus1 for SWI exceptions
@@ -64,7 +64,7 @@ fast_interrupt_asm:
   pop   {r0-r12}
   ldm   sp!, {pc}^
 
-@ the <unhandled_*> trampolines are in 
+@ the <unhandled_*> trampolines are in
 @       <staff-src/unhandled-exception.S>
 _reset_asm:                   .word unhandled_reset
 _undefined_instruction_asm:   .word unhandled_undefined_instruction
@@ -76,10 +76,10 @@ _interrupt_asm:               .word unhandled_interrupt
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 @ slight rewrite of the above:
 @  - since we don't have to copy the interrupt table can get rid
-@    of it and jump right to the trampoline code. 
+@    of it and jump right to the trampoline code.
 
 @ roughly our original approach
-@ the unhandled trampolines are in 
+@ the unhandled trampolines are in
 @       <staff-src/unhandled-exception.S>
 .align 5
 .globl _interrupt_vector_slow
@@ -91,15 +91,15 @@ _interrupt_vector_slow:
   ldr pc, =unhandled_data_abort
   ldr pc, =unhandled_interrupt
 
-@ TODO: change the SWI call to do a relative branch <b> 
-@ to sys_plus1_handler --- can do this since we don't have 
+@ TODO: change the SWI call to do a relative branch <b>
+@ to sys_plus1_handler --- can do this since we don't have
 @ to copy the vector anywhere.
 .align 5
 .globl _interrupt_vector_fast
 _interrupt_vector_fast:
   ldr pc, =unhandled_reset
   ldr pc, =unhandled_undefined_instruction
-  ldr pc, =unhandled_swi
+  b sys_plus1_handler
   ldr pc, =unhandled_prefetch_abort
   ldr pc, =unhandled_data_abort
   ldr pc, =unhandled_interrupt

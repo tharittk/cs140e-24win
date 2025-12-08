@@ -9,6 +9,7 @@
  */
 #include "gpio.h"
 #include "rpi.h"
+#include "rpi-interrupts.h"
 
 // see broadcomm documents for magic addresses.
 enum
@@ -98,7 +99,7 @@ int gpio_read(unsigned pin)
 // lab 9: interrupt
 static void or32(volatile void* addr, uint32_t val){
     dev_barrier();
-    PUT32(addr, GET32(addr) | val);
+    PUT32((unsigned) addr, GET32( (unsigned) addr) | val);
     dev_barrier();
 }
 
@@ -121,9 +122,9 @@ void gpio_int_falling_edge(unsigned int pin){
     OR32(reg, 1 << (pin % 32));
 }
 
-void gpio_event_detected(unsigned int pin){
+int gpio_event_detected(unsigned pin){
     if (pin > 53)
-        return;
+        return 0;
     unsigned reg = pin < 32 ? gpio_eds0 : gpio_eds1;
     return GET32(reg) & (1 << (pin % 32));
 }
