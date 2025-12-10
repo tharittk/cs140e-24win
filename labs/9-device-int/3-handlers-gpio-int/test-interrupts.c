@@ -1,5 +1,8 @@
 // test code for checking the interrupts.
 #include "test-interrupts.h"
+#include "gpio.h"
+#include "rpi-interrupts.h"
+#include "rpi.h"
 
 volatile int n_interrupt;
 
@@ -9,15 +12,45 @@ void interrupt_vector(unsigned pc) {
     dev_barrier();
     n_interrupt++;
 
-    if(!interrupt_fn(pc))
-        panic("should have no other interrupts?\n");
+    // if(!interrupt_fn(pc))
+    //     panic("should have no other interrupts?\n");
+
+    // check what type of interrupt
+    unsigned is_timer = GET32(IRQ_basic_pending) & RPI_BASIC_ARM_TIMER_IRQ;
+    dev_barrier();
+
+    // falling and risinging comes in the same interrupt line
+    unsigned is_gpio_interrupt0 = GET32(IRQ_pending_2) & (1 << (GPIO_INT0 % 32));
+    dev_barrier();
+
+    if (is_timer){
+        timer_test_handler(pc);
+    } else if (is_gpio_interrupt0){
+        // the test code writing to outpin which loops-back and triggers
+        // its effect on in_pin
+        if (!gpio_event_detected(in_pin))
+            panic("gpio-int0 is triggered, expect event detect at in_pin %d \n", in_pin);
+
+        // figure out if it is falling or rising edge.
+        // the PRELAB suggests this scheme.
+        // trace("gpio_interrupt detected in_pin value: %d\n", gpio_read(in_pin));
+        if (gpio_read(in_pin)){
+            // trace("rising detected \n");
+            rising_handler(pc);
+        } else {
+            // trace("falling detected \n");
+            falling_handler(pc);
+        }
+    } else {
+        panic("should only be either timer, gpio_interrupt_0 \n");
+    }
 
     dev_barrier();
 }
 
 #include "vector-base.h"
 
-// initialize all the interrupt stuff.  client passes in the 
+// initialize all the interrupt stuff.  client passes in the
 // gpio int routine <fn>
 //
 // make sure you understand how this works.
@@ -52,7 +85,8 @@ volatile int n_falling;
 
 // check if there is an event, check if it was a falling edge.
 int falling_handler(uint32_t pc) {
-    todo("implement this: return 0 if no rising int\n");
+    ++n_falling;
+    gpio_event_clear(in_pin);
     return 0;
 }
 
@@ -69,7 +103,8 @@ volatile int n_rising;
 
 // check if there is an event, check if it was a rising edge.
 int rising_handler(uint32_t pc) {
-    todo("implement this: return 0 if no rising int\n");
+    ++n_rising;
+    gpio_event_clear(in_pin);
     return 0;
 }
 
@@ -91,6 +126,7 @@ void timer_test_init(void) {
 
 int timer_test_handler(uint32_t pc) {
     dev_barrier();
-    todo("implement this by stealing pieces from 5-interrupts/0-timer-int");
+    PUT32(arm_timer_IRQClear, 1);
     dev_barrier();
+    return 0;
 }

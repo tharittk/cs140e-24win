@@ -1,8 +1,9 @@
+# PROG_SRC = $(wildcard ./[67]*.c)
 PROG_SRC = $(wildcard ./[67]*.c)
 SRC = fake-pi.c  fake-random.c  pi-random.c
 
 # this is your code.
-SRC +=  gpio-int.c  
+SRC +=  gpio-int.c
 
 LPP = $(CS140E_2024_PATH)/libpi
 CFLAGS += -DRPI_UNIX -I$(LPP)/include
@@ -24,4 +25,3 @@ checkoff: $(PROGS)
 	@printf "total progs =: ";
 	@ls $(PROGS) | wc -l
 	cksum *.out | sort -n | cksum
-
