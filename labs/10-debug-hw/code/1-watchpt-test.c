@@ -43,7 +43,7 @@ static void watchpt_fault(regs_t *r) {
     // currently we just expect it to be +4
     uint32_t expect_pc = pc-4;
     if(fault_pc != expect_pc)
-        panic("exception fault pc=%p != watchpt_fault_pc() pc=%p\n", 
+        panic("exception fault pc=%p != watchpt_fault_pc() pc=%p\n",
             expect_pc, fault_pc);
 
     // we are only using GET32/PUT32 to load/store.
@@ -75,11 +75,10 @@ void notmain(void) {
     full_except_install(0);
     full_except_set_data_abort(watchpt_fault);
 
-    todo("enable the debug coprocessor.");
     cp14_enable();
 
-    /* 
-     * see: 
+    /*
+     * see:
      *   - 13-47: how to set a simple watchpoint.
      *   - 13-17 for how to set bits in the <wcr0>
      */
@@ -92,11 +91,12 @@ void notmain(void) {
 
     // set watchpoint.
     assert(!cp14_wcr0_is_enabled());
-    uint32_t b = 0;
-    if(!b)
-        panic("set b to the right bits for wcr0\n");
+    // uint32_t b = 0;
+    // if(!b)
+        // panic("set b to the right bits for wcr0\n");
 
-    cp14_wcr0_set(b);
+    // cp14_wcr0_set(b);
+    cp14_wcr0_enable();
     cp14_wvr0_set(null);
     assert(cp14_wcr0_is_enabled());
 
@@ -113,7 +113,7 @@ void notmain(void) {
    // note, this should not fault.
     uint32_t x = GET32(null);
     if(x == val)
-        trace("SUCCESS: correctly got a fault on addr=%x, val=%x\n", 
+        trace("SUCCESS: correctly got a fault on addr=%x, val=%x\n",
                                 null, x);
     else
         panic("returned %x, expected %x\n", x, val);
@@ -124,7 +124,8 @@ void notmain(void) {
 
     // set up the fault again.
     trace("setting watchpoint for addr %p\n", null);
-    cp14_wcr0_set(b);
+    // cp14_wcr0_set(b);
+    cp14_wcr0_enable();
     cp14_wvr0_set(null);
     assert(cp14_wcr0_is_enabled());
 

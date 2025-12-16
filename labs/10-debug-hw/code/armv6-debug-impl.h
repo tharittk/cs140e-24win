@@ -46,7 +46,7 @@ static inline void prefetch_flush(void) {
 // make both get and set methods.
 #define coproc_mk(fn, coproc, opcode_1, Crn, Crm, opcode_2)     \
     coproc_mk_set(fn, coproc, opcode_1, Crn, Crm, opcode_2)        \
-    coproc_mk_get(fn, coproc, opcode_1, Crn, Crm, opcode_2) 
+    coproc_mk_get(fn, coproc, opcode_1, Crn, Crm, opcode_2)
 
 // produces p14_brv_get and p14_brv_set
 // coproc_mk(brv, p14, 0, c0, crm, op2)
@@ -78,7 +78,7 @@ struct debug_id {
 
 // Get the debug id register
 static inline uint32_t cp14_debug_id_get(void) {
-    // the documents seem to imply the general purpose register 
+    // the documents seem to imply the general purpose register
     // SBZ ("should be zero") so we clear it first.
     uint32_t ret = 0;
 
@@ -116,9 +116,24 @@ static inline uint32_t cp14_dscr_get(void);
 // cp14_status_get, cp14_status_set
 
 // you'll need to define these and a bunch of other routines.
-static inline uint32_t cp15_dfsr_get(void) { todo("implement"); }
-static inline uint32_t cp15_ifar_get(void) { todo("implement"); }
-static inline uint32_t cp15_ifsr_get(void) { todo("implement"); }
+static inline uint32_t cp15_dfsr_get(void) {
+    uint32_t ret = 0;
+    asm volatile ("mrc p15, 0, %0, c5, c0, 0":"=r"(ret));
+    return ret;
+}
+static inline uint32_t cp15_ifar_get(void) {
+    // 3-69
+    // address instruction that causes prefetch abort
+    // advised to use for true prefetch abort (not the debug event)
+    uint32_t ret = 0;
+    asm volatile ("mrc p15, 0, %0, c6, c0, 2":"=r"(ret));
+    return ret;
+}
+static inline uint32_t cp15_ifsr_get(void) {
+    uint32_t ret = 0;
+    asm volatile ("mrc p15, 0, %0, c5, c0, 1":"=r"(ret));
+    return ret;
+}
 static inline uint32_t cp14_dscr_get(void) {
     uint32_t ret = 0;
     asm volatile ("mrc p14, 0, %0, c0, c1, 0" : "=r"(ret));
@@ -126,53 +141,53 @@ static inline uint32_t cp14_dscr_get(void) {
 }
 
 static inline void cp14_dscr_set(uint32_t status){
-    asm volatile("mcr p14, 0, %0, c0, c1, 0" :: "r"(r));
+    asm volatile("mcr p14, 0, %0, c0, c1, 0" :: "r"(status));
 }
 
 static inline uint32_t cp14_wcr0_get(void) {
     uint32_t ret = 0;
-    asm volatile("mrc p14, 0, %0, c0, c112, 7": "=r"(ret));
+    asm volatile("mrc p14, 0, %0, c0, c0, 7": "=r"(ret));
     return ret;
 }
 static inline void cp14_wcr0_set(uint32_t r) {
-    asm volatile ("mcr p14, 0, %0, c0, c112, 7" ::"r"(r));
+    asm volatile ("mcr p14, 0, %0, c0, c0, 7" ::"r"(r));
     prefetch_flush();
 }
 
 static inline uint32_t cp14_wvr0_get(void) {
     uint32_t ret = 0;
-    asm volatile("mrc p14, 0, %0, c0, c96, 6": "=r"(ret));
+    asm volatile("mrc p14, 0, %0, c0, c0, 6": "=r"(ret));
     return ret;
 }
 static inline void cp14_wvr0_set(uint32_t r) {
-    asm volatile ("mcr p14, 0, %0, 0, c96, 6" ::"r"(r));
+    asm volatile ("mcr p14, 0, %0, c0, c0, 6" ::"r"(r));
     prefetch_flush();
 }
 
 static inline uint32_t cp14_bcr0_get(void) {
     uint32_t ret = 0;
-    asm volatile ("mrc p14, 0, %0, c0, c96, 5" :"=r"(ret));
+    asm volatile ("mrc p14, 0, %0, c0, c0, 5" :"=r"(ret));
     return ret;
 }
 static inline void cp14_bcr0_set(uint32_t r) {
-    asm volatile ("mcr p14, 0, %0, c0, c80, 5" ::"r"(r));
+    asm volatile ("mcr p14, 0, %0, c0, c0, 5" ::"r"(r));
     prefetch_flush();
 }
 
-static inline uint32_t cp14_bcr0_get(void) {
+static inline uint32_t cp14_bvr0_get(void) {
     uint32_t ret = 0;
-    asm volatile ("mrc p14, 0, %0, c0, c64, 4" :"=r"(ret));
+    asm volatile ("mrc p14, 0, %0, c0, c0, 4" :"=r"(ret));
     return ret;
 }
 static inline void cp14_bvr0_set(uint32_t r) {
-    asm volatile ("mcr p14, 0, %0, c0, c64, 4" ::"r"(r));
+    asm volatile ("mcr p14, 0, %0, c0, c0, 4" ::"r"(r));
     prefetch_flush();
 }
 
 
-// return 1 if enabled, 0 otherwise.  
+// return 1 if enabled, 0 otherwise.
 //    - we wind up reading the status register a bunch:
-//      could return its value instead of 1 (since is 
+//      could return its value instead of 1 (since is
 //      non-zero).
 static inline int cp14_is_enabled(void) {
     uint32_t v = cp14_dscr_get();
@@ -181,13 +196,13 @@ static inline int cp14_is_enabled(void) {
     return bit_is_on(v, 15);
 }
 
-// enable debug coprocessor 
+// enable debug coprocessor
 static inline void cp14_enable(void) {
     // if it's already enabled, just return?
     if(cp14_is_enabled())
         panic("already enabled\n");
 
-    // for the core to take a debug exception, monitor debug mode has to be both 
+    // for the core to take a debug exception, monitor debug mode has to be both
     // selected and enabled --- bit 14 clear and bit 15 set.
 
     // 13-9
@@ -221,12 +236,26 @@ static inline int cp14_bcr0_is_enabled(void) {
     return bit_get(v, 0);
 }
 static inline void cp14_bcr0_enable(void) {
-    uint32_t v = cp14_bcr0_get();
-    v = bit_set(v, 0);
-    cp14_bcr_set(v);
+    if (!cp14_bcr0_is_enabled()){
+        // 13-18
+        uint32_t v = cp14_bcr0_get();
+        // address matches
+        v = bits_set(v, 21, 22, 0b00);
+        // no linking
+        v = bit_clr(v,  20);
+        // match both secure and non-secure world
+        v = bits_set(v, 14, 15, 0b00);
+        // match all byte offset
+        v = bits_set(v, 5, 8, 0b1111);
+        // allow for both supervisor and user priviledge
+        v = bits_set(v, 1, 2, 0b11);
+        // enable it
+        v = bit_set(v, 0);
+        cp14_bcr0_set(v);
+    }
 }
 static inline void cp14_bcr0_disable(void) {
-    uint32_t v = cp14_bcr_get();
+    uint32_t v = cp14_bcr0_get();
     v = bit_clr(v, 0);
     cp14_bcr0_set(v);
 }
@@ -234,8 +263,14 @@ static inline void cp14_bcr0_disable(void) {
 // was this a brkpt fault?
 static inline int was_brkpt_fault(void) {
     // use IFSR and then DSCR
-    unimplemented();
-
+    uint32_t ifsr = cp15_ifsr_get();
+    // 3-67 bit[10] == 0 and bit[3:0] == 0b0010, instruction debug fault event
+    if (bit_is_off(ifsr, 10) && bits_get(ifsr, 0, 3) == 0b0010){
+        uint32_t dscr = cp14_dscr_get();
+        // 13-11 bit[5:2] == 0b0001 is when breakpoint debug occurs
+        if (bits_get(dscr, 2, 5) == 0b0001)
+            return 1;
+    }
     return 0;
 }
 
@@ -252,22 +287,57 @@ static inline int datafault_from_st(void) {
 // 13-33: tabl 13-23
 static inline int was_watchpt_fault(void) {
     // use DFSR then DSCR
-    unimplemented();
+    uint32_t dfsr = cp15_dfsr_get();
+    // 3-65 bit[10] == 0 and bit[3:0] == 0b0010, debug fault event
+    if (bit_is_off(dfsr, 10) && bits_get(dfsr, 0, 3) == 0b0010){
+        uint32_t dscr = cp14_dscr_get();
+        // 13-11 bit[5:2] == 0b0010 is when watchpoint debug occurs
+        if (bits_get(dscr, 2, 5) == 0b0010)
+            return 1;
+    }
+    return 0;
 }
 
 static inline int cp14_wcr0_is_enabled(void) {
-    unimplemented();
+    // 13-22
+    uint32_t wcr0 = cp14_wcr0_get();
+    return bit_is_on(wcr0, 0);
 }
+
 static inline void cp14_wcr0_enable(void) {
-    unimplemented();
+    if (!cp14_wcr0_is_enabled()){
+        // 13-21
+        uint32_t v = cp14_wcr0_get();
+        // disable link
+        v = bit_clr(v, 20);
+        // match both secure and non-secure world
+        v = bits_set(v, 14, 15, 0b00);
+        // match all byte offset
+        v = bits_set(v, 5, 8, 0b1111);
+        // either save or load
+        v = bits_set(v, 3, 4, 0b11);
+        // allow for both supervisor and user priviledge
+        v = bits_set(v, 1, 2, 0b11);
+        // enable it
+        v = bit_set(v, 0);
+        cp14_wcr0_set(v);
+    }
 }
 static inline void cp14_wcr0_disable(void) {
-    unimplemented();
+    if (cp14_wcr0_is_enabled()){
+        uint32_t v = cp14_wcr0_get();
+        v = bit_clr(v, 0);
+        cp14_wcr0_set(v);
+    }
 }
 
 // Get watchpoint fault using WFAR
 static inline uint32_t watchpt_fault_pc(void) {
-    unimplemented();
+
+    // 13-12 - should I check previledge ?
+    uint32_t wfar = 0;
+    asm volatile ("mrc p14, 0, %0, c0, c6, 0":"=r"(wfar));
+    return (wfar - 8);
 }
-    
+
 #endif

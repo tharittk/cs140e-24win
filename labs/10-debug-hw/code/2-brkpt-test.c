@@ -22,7 +22,7 @@ static volatile int n_faults = 0;
 
    See:
      - IFSR 3-67 in docs/arm1176-fault-regs.pdf
-     - DSCR 13-35 in docs/arm1176-ch13-debug.pdf 
+     - DSCR 13-35 in docs/arm1176-ch13-debug.pdf
 
   - `IFSR`: set whenever breakpoint occurs.   Checked in prefetch abort.
 
@@ -89,12 +89,13 @@ void notmain(void) {
     assert(!cp14_bcr0_is_enabled());
 
     // see 13-17 for how to set bits
-    uint32_t b = 0;
+    // uint32_t b = 0;
 
-    if(!b)
-        panic("must set b to the right bits\n");
+    // if(!b)
+        // panic("must set b to the right bits\n");
 
-    cp14_bcr0_set(b);
+    // cp14_bcr0_set(b);
+    cp14_bcr0_enable();
     cp14_bvr0_set((uint32_t)foo);
     assert(cp14_bcr0_is_enabled());
 
