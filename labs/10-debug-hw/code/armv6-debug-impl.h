@@ -97,9 +97,9 @@ coproc_mk_get(debug_id_macro, p14, 0, c0, c0, 0)
 static inline void cp14_enable(void);
 
 // get the cp14 status register.
-static inline uint32_t cp14_status_get(void);
+// static inline uint32_t cp14_status_get(void);
 // set the cp14 status register.
-static inline void cp14_status_set(uint32_t status);
+// static inline void cp14_status_set(uint32_t status);
 
 #if 0
 static inline uint32_t cp15_dfsr_get(void);
@@ -112,18 +112,62 @@ static inline uint32_t cp14_dscr_get(void);
 // all your code should go here.  implementation of the debug interface.
 
 // example of how to define get and set for status registers
-coproc_mk(status, p14, 0, c0, c1, 0)
+// coproc_mk(status, p14, 0, c0, c1, 0)
+// cp14_status_get, cp14_status_set
 
 // you'll need to define these and a bunch of other routines.
 static inline uint32_t cp15_dfsr_get(void) { todo("implement"); }
 static inline uint32_t cp15_ifar_get(void) { todo("implement"); }
 static inline uint32_t cp15_ifsr_get(void) { todo("implement"); }
-static inline uint32_t cp14_dscr_get(void) { todo("implement"); }
-static inline uint32_t cp14_wcr0_set(uint32_t r) { todo("implement"); }
+static inline uint32_t cp14_dscr_get(void) {
+    uint32_t ret = 0;
+    asm volatile ("mrc p14, 0, %0, c0, c1, 0" : "=r"(ret));
+    return ret;
+}
 
-static inline void cp14_wvr0_set(uint32_t r) { todo("implement"); }
-static inline void cp14_bcr0_set(uint32_t r) { todo("implement"); }
-static inline void cp14_bvr0_set(uint32_t r) { todo("implement"); }
+static inline void cp14_dscr_set(uint32_t status){
+    asm volatile("mcr p14, 0, %0, c0, c1, 0" :: "r"(r));
+}
+
+static inline uint32_t cp14_wcr0_get(void) {
+    uint32_t ret = 0;
+    asm volatile("mrc p14, 0, %0, c0, c112, 7": "=r"(ret));
+    return ret;
+}
+static inline void cp14_wcr0_set(uint32_t r) {
+    asm volatile ("mcr p14, 0, %0, c0, c112, 7" ::"r"(r));
+    prefetch_flush();
+}
+
+static inline uint32_t cp14_wvr0_get(void) {
+    uint32_t ret = 0;
+    asm volatile("mrc p14, 0, %0, c0, c96, 6": "=r"(ret));
+    return ret;
+}
+static inline void cp14_wvr0_set(uint32_t r) {
+    asm volatile ("mcr p14, 0, %0, 0, c96, 6" ::"r"(r));
+    prefetch_flush();
+}
+
+static inline uint32_t cp14_bcr0_get(void) {
+    uint32_t ret = 0;
+    asm volatile ("mrc p14, 0, %0, c0, c96, 5" :"=r"(ret));
+    return ret;
+}
+static inline void cp14_bcr0_set(uint32_t r) {
+    asm volatile ("mcr p14, 0, %0, c0, c80, 5" ::"r"(r));
+    prefetch_flush();
+}
+
+static inline uint32_t cp14_bcr0_get(void) {
+    uint32_t ret = 0;
+    asm volatile ("mrc p14, 0, %0, c0, c64, 4" :"=r"(ret));
+    return ret;
+}
+static inline void cp14_bvr0_set(uint32_t r) {
+    asm volatile ("mcr p14, 0, %0, c0, c64, 4" ::"r"(r));
+    prefetch_flush();
+}
 
 
 // return 1 if enabled, 0 otherwise.  
@@ -131,7 +175,10 @@ static inline void cp14_bvr0_set(uint32_t r) { todo("implement"); }
 //      could return its value instead of 1 (since is 
 //      non-zero).
 static inline int cp14_is_enabled(void) {
-    unimplemented();
+    uint32_t v = cp14_dscr_get();
+
+    // 13-9: Monitor debug-mode enable
+    return bit_is_on(v, 15);
 }
 
 // enable debug coprocessor 
@@ -142,7 +189,13 @@ static inline void cp14_enable(void) {
 
     // for the core to take a debug exception, monitor debug mode has to be both 
     // selected and enabled --- bit 14 clear and bit 15 set.
-    unimplemented();
+
+    // 13-9
+    uint32_t v = cp14_dscr_get();
+    v = bit_set(v, 15);
+    v = bit_clr(v, 14);
+
+    cp14_dscr_set(v);
 
     assert(cp14_is_enabled());
 }
@@ -152,20 +205,30 @@ static inline void cp14_disable(void) {
     if(!cp14_is_enabled())
         return;
 
-    unimplemented();
+    // 13-9
+    uint32_t v = cp14_dscr_get();
+    v = bit_clr(v, 15);
+
+    cp14_dscr_set(v);
 
     assert(!cp14_is_enabled());
 }
 
 
 static inline int cp14_bcr0_is_enabled(void) {
-    unimplemented();
+    uint32_t v = cp14_bcr0_get();
+    // 13-19 table 13-12
+    return bit_get(v, 0);
 }
 static inline void cp14_bcr0_enable(void) {
-    unimplemented();
+    uint32_t v = cp14_bcr0_get();
+    v = bit_set(v, 0);
+    cp14_bcr_set(v);
 }
 static inline void cp14_bcr0_disable(void) {
-    unimplemented();
+    uint32_t v = cp14_bcr_get();
+    v = bit_clr(v, 0);
+    cp14_bcr0_set(v);
 }
 
 // was this a brkpt fault?
