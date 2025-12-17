@@ -23,10 +23,11 @@ own simple, clean operating system for the widely-used, ARM-based
 - [x] Self-Replicating Code (implementing Ken Thompson's paper)
 - [x] GPIO: First time with with BCM2835 Datasheet
 - [x] Cross-check: Use checksum with tracing (extensively)
-- [x] Interrupt: BCM2835 Datasheet again, code trapping mechanism (ARM Assembly heavy)
+- [x] Interrupt: BCM2835 Datasheet again, code trapping mechanism with timer interrupt (ARM Assembly heavy)
 - [x] Thread: hand-roll a simple thread + context switch mechanism. Learn how to "brain surgey" through implementign `fork`
 - [x] Bootleader: Makes Unix + Pi talk. Sending code through UART.
 - [x] UART Driver: life was good when you have an access to `printk`. Now I cannot take it as given.
+- [x] Interrupt Part 2: program the BCM2835 to handle interrupt from custom sources like GPIO pins
+- [x] Debug Hardware: set and handle breakpoint/watchpoint exceptions and work with co-processor registers.
 
-
-Last updated @ November 13, 2025
+Last updated @ December 17, 2025
