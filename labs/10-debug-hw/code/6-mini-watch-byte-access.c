@@ -1,24 +1,24 @@
 // test of:
 //   1. the debug interface (see debug.c)
-//   2. that you can trap on sub-word read/writes 
+//   2. that you can trap on sub-word read/writes
 
 #include "rpi.h"
 #include "mini-watch.h"
 
-// set these before each fault so we can check that the right 
+// set these before each fault so we can check that the right
 // thing happened.
 static volatile uint32_t expected_fault_addr;
 static volatile uint32_t expected_fault_pc;
 static volatile uint32_t load_fault_n, store_fault_n;
 
 // change to passing in the saved registers.
-static void 
+static void
 watchpt_handler(void *data, watch_fault_t *w) {
     if(w->fault_addr != (void*)expected_fault_addr)
-        panic("expected watchpt fault on addr %p, have %p\n", 
+        panic("expected watchpt fault on addr %p, have %p\n",
                         expected_fault_addr, w->fault_addr);
     if(w->fault_pc != expected_fault_pc)
-        panic("expected watchpt fault at pc=%p, faulted at=%p\n", 
+        panic("expected watchpt fault at pc=%p, faulted at=%p\n",
                         expected_fault_pc, w->fault_pc);
 
     if(w->is_load_p) {
@@ -34,7 +34,7 @@ watchpt_handler(void *data, watch_fault_t *w) {
 }
 
 //test that watchpoint works:
-//  1. set a watchpoint on <fault_addr>, 
+//  1. set a watchpoint on <fault_addr>,
 //  2. do a PUT8(fault_addr), check result.
 //  3. do a GET8(fault_addr), check result.
 static void test_bad_addr(uint32_t fault_addr) {
@@ -47,7 +47,7 @@ static void test_bad_addr(uint32_t fault_addr) {
     expected_fault_addr = fault_addr;
     trace("about to test addr %x\n", fault_addr);
 
-    // one-time setup for this address: 
+    // one-time setup for this address:
     //  install the watchpoint handler.
     mini_watch_addr((void*)fault_addr);
     assert(mini_watch_enabled());

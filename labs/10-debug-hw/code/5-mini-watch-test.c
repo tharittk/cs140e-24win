@@ -7,7 +7,7 @@ static volatile uint32_t expected_fault_addr;
 static volatile uint32_t expected_fault_pc;
 
 // change to passing in the saved registers.
-static void 
+static void
 watchpt_handler(void *data, watch_fault_t *w) {
     if(w->fault_addr != (void*)expected_fault_addr)
         panic("expected watchpt fault on addr %p, have %p\n",
@@ -64,6 +64,6 @@ void notmain(void) {
 
     if(got != val)
         panic("expected GET(%x)=%x, have %x\n", null, val, got);
-    
+
     trace("SUCCESS\n");
 }

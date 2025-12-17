@@ -204,9 +204,10 @@ static inline int cp14_is_enabled(void) {
 
 // enable debug coprocessor
 static inline void cp14_enable(void) {
-    // if it's already enabled, just return?
+    // if it's already enabled, just return? - seems like it
     if(cp14_is_enabled())
-        panic("already enabled\n");
+        return;
+        // panic("already enabled\n");
 
     // for the core to take a debug exception, monitor debug mode has to be both
     // selected and enabled --- bit 14 clear and bit 15 set.
@@ -255,6 +256,26 @@ static inline void cp14_bcr0_enable(void) {
         v = bits_set(v, 5, 8, 0b1111);
         // allow for both supervisor and user priviledge
         v = bits_set(v, 1, 2, 0b11);
+        // enable it
+        v = bit_set(v, 0);
+        cp14_bcr0_set(v);
+    }
+}
+
+static inline void cp14_bcr0_enable_mismatch(void) {
+    if (!cp14_bcr0_is_enabled()){
+        // 13-18
+        uint32_t v = cp14_bcr0_get();
+        // address MISMATCH
+        v = bits_set(v, 21, 22, 0b11);
+        // no linking
+        v = bit_clr(v,  20);
+        // match both secure and non-secure world
+        v = bits_set(v, 14, 15, 0b00);
+        // match all byte offset
+        v = bits_set(v, 5, 8, 0b1111);
+        // ? USER ONLY ?
+        v = bits_set(v, 1, 2, 0b10);
         // enable it
         v = bit_set(v, 0);
         cp14_bcr0_set(v);

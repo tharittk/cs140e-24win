@@ -1,6 +1,8 @@
-// very simple code to just run a single function at user level in mismatch 
-// mode.  
+// very simple code to just run a single function at user level in mismatch
+// mode.
+//
 #include "rpi.h"
+#include "full-except.h"
 #include "armv6-debug-impl.h"
 #include "mini-step.h"
 
@@ -28,13 +30,17 @@ static inline uint32_t mismatch_pc_set(uint32_t pc) {
 
     // set a mismatch (vs match) using bvr0 and bcr0 on
     // <pc>
-    todo("setup mismatch on <pc> using bvr0/bcr0");
+    // setup mismatch on <pc> using bvr0/bcr0
+
+    cp14_bvr0_set(pc);
+    cp14_bcr0_enable_mismatch();
+    prefetch_flush();
 
     assert( cp14_bvr0_get() == pc);
     return old_pc;
 }
 
-// on/start maybe do different things?  
+// on/start maybe do different things?
 static inline void mismatch_on(void) {
     assert(!single_step_on_p);
     single_step_on_p = 1;
@@ -51,9 +57,9 @@ static inline void mismatch_off(void) {
     assert(single_step_on_p);
     single_step_on_p = 0;
 
-    // RMW bcr0 to disable breakpoint, 
+    // RMW bcr0 to disable breakpoint,
     // make sure you do a prefetch_flush!
-    todo("turn mismatch off, but don't modify anything else");
+    cp14_bcr0_disable();
 }
 
 // once the traced code calls this, it's done.
@@ -67,7 +73,7 @@ void ss_on_exit(int exitcode) {
 // 2. otherwise setup the fault and call the
 //    handler.  will look like 2-brkpt-test.c
 //    somewhat.
-// 3. when returns, set the mismatch on the 
+// 3. when returns, set the mismatch on the
 //    current pc.
 // 4. wait until the UART can get a putc before
 //    return (if you don't do this what happens?)
@@ -83,14 +89,18 @@ static void mismatch_fault(regs_t *r) {
     }
 
     step_fault_t f = {};
-    todo("setup fault handler and call step_handler");
-    todo("setup a mismatch on pc");
+    // setup fault handler and call step_handler
+    f = step_fault_mk(pc, r);
+    step_handler(step_handler_data, &f);
 
-    // otherwise there is a race condition if we are 
+    // setup a mismatch on pc
+    mismatch_pc_set(pc);
+
+    // otherwise there is a race condition if we are
     // stepping through the uart code --- note: we could
     // just check the pc and the address range of
     // uart.o
-    while(!uart_can_putc())
+    while(!uart_can_put8())
         ;
 
     switchto(r);
@@ -104,22 +114,34 @@ void mini_step_init(step_handler_t h, void *data) {
     step_handler_data = data;
     step_handler = h;
 
-    todo("setup the rest");
+    // don't override vector table
+    full_except_install(0);
+
+    // install handler
+    full_except_set_prefetch(mismatch_fault);
+
+    // enable debug - need to this before accessing any cp14 registers
+    cp14_enable();
 
     // just started, should not be enabled.
     assert(!cp14_bcr0_is_enabled());
-    assert(!cp14_bcr0_is_enabled());
+    assert(!cp14_wcr0_is_enabled());
+    // NO, this will trigger exception right away
+    // while the bvr0 is still a garbage
+    // cp14_bcr0_enable_mismatch();
+    step_handler = h;
+    step_handler_data = data;
 }
 
 // run <fn> with argument <arg> in single step mode.
 uint32_t mini_step_run(void (*fn)(void*), void *arg) {
     uint32_t pc = (uint32_t)fn;
 
-    // we use the same stack at the same address so the 
+    // we use the same stack at the same address so the
     // values check out from run to run.
     static void *stack = 0;
     enum { stack_size = 8192*4};
-    
+
     if(!stack)
         stack = kmalloc(stack_size);
 

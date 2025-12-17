@@ -12,9 +12,10 @@ SRC += ../labs/8-uart/2-uart/uart.c
 # you would add the path to yours.
 # STAFF_OBJS  +=  ./staff-objs/uart.o
 STAFF_OBJS  +=  ./staff-objs/gpio-pud.o
-STAFF_OBJS  +=  ./staff-objs/gpio-int.o 
-
-# you should not have to modify this variable.  
+STAFF_OBJS  +=  ./staff-objs/gpio-int.o
+# lab 10: single-stepping
+STAFF_OBJS  +=  ./staff-objs/kmalloc.o
+# you should not have to modify this variable.
 SRC :=  $(SRC)                              \
         $(wildcard ./libc/*.[Sc])           \
         $(wildcard ./staff-src/*.[Sc])      \

@@ -1,5 +1,6 @@
 # you'll implement <mini-watch.c> later in lab
 COMMON_SRC += mini-watch.c
+COMMON_SRC += mini-step.c
 COMMON_SRC += staff-full-except.c
 
 # you'll do these next week.
@@ -18,7 +19,9 @@ START_ASM = staff-start.S
 # PROGS := 1-watchpt-test.c  2-brkpt-test.c
 # PROGS := 1-watchpt-test.c
 # PROGS := 5-mini-watch-test.c
-PROGS := 6-mini-watch-byte-access.c
+# PROGS := 6-mini-watch-byte-access.c
+# PROGS := 7-mini-step-trace-only.c
+PROGS := 7-mini-step-diff.c
 
 # PROGS := $(wildcard ./[123456]-*.c)
 
