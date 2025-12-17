@@ -15,9 +15,10 @@ RUN=1
 START_ASM = staff-start.S
 
 # simple watchpoint test
-PROGS := 1-watchpt-test.c  2-brkpt-test.c
+# PROGS := 1-watchpt-test.c  2-brkpt-test.c
 # PROGS := 1-watchpt-test.c
-# PROGS := 2-brkpt-test.c
+# PROGS := 5-mini-watch-test.c
+PROGS := 6-mini-watch-byte-access.c
 
 # PROGS := $(wildcard ./[123456]-*.c)
 

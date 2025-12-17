@@ -1,5 +1,8 @@
 #ifndef __MINI_WATCH_H__
 #define __MINI_WATCH_H__
+
+#include "rpi.h"
+#include "vector-base.h"
 #include "armv6-debug-impl.h"
 #include "full-except.h"
 
@@ -19,10 +22,10 @@ static inline watch_fault_t watch_fault_mk(
     uint32_t fault_pc,
     void *fault_addr,
     unsigned is_load_p,
-    regs_t *regs) 
+    regs_t *regs)
 {
-    return (watch_fault_t) { 
-        .fault_pc = fault_pc, 
+    return (watch_fault_t) {
+        .fault_pc = fault_pc,
         .fault_addr = fault_addr,
         .is_load_p = is_load_p,
         .regs = regs
@@ -34,7 +37,7 @@ static inline watch_fault_t watch_fault_mk(
 // structure describing the current fault.
 typedef void (*watch_handler_t)(void *data, watch_fault_t *fault);
 
-// initialize watchpoint: any fault will call 
+// initialize watchpoint: any fault will call
 // <h> passing <data> and a structure with info about
 // current fault.
 void mini_watch_init(watch_handler_t h, void *data);

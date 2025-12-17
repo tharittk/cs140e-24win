@@ -144,6 +144,12 @@ static inline void cp14_dscr_set(uint32_t status){
     asm volatile("mcr p14, 0, %0, c0, c1, 0" :: "r"(status));
 }
 
+static inline uint32_t cp15_far_get(){
+    uint32_t far = 0;
+    asm volatile ("mrc p15, 0, %0, c6, c0, 0":"=r"(far));
+    return far;
+}
+
 static inline uint32_t cp14_wcr0_get(void) {
     uint32_t ret = 0;
     asm volatile("mrc p14, 0, %0, c0, c0, 7": "=r"(ret));
