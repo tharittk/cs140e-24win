@@ -82,7 +82,7 @@ enum {
     USER_CTRL = 0x6a,   // p 39
 
     // p31,32
-    ACCEL_XOUT_H = 0x3b,
+    accel_xout_h= 0x3b,
     accel_xout_l = 0x3c,
     accel_yout_h = 0x3d,
     accel_yout_l = 0x3e,
@@ -122,8 +122,13 @@ imu_xyz_t accel_scale(accel_t *h, imu_xyz_t xyz) {
 // pull the reading into a circular buffer
 // (similar to device lab).
 int accel_has_data(const accel_t *h) {
-    todo("check that have data");
-    return 1;
+    // p 29: bit0 (data ready)
+    uint8_t status = imu_rd(h->addr, INT_STATUS);
+    return bit_get(status, 0);
+
+    // replace with gpio wiring. also works
+    // uint32_t v = gpio_read(26);
+    // return v & 1;
 }
 
 
@@ -133,7 +138,10 @@ int accel_has_data(const accel_t *h) {
 // i'd suggest playing w/ gdb or small C programs to see that what
 // C does matches your intuition.
 static short mg_raw(uint8_t lo, uint8_t hi) {
-    todo("combine both bytes (make sure sign extended)");
+    short combine = 0;
+    combine |= (hi << 8);
+    combine |= lo;
+    return combine;
 }
 
 // sanity testing code.
@@ -170,7 +178,20 @@ accel_t mpu6050_accel_init(uint8_t addr, unsigned accel_g) {
     test_mg(-1000, 0xbf, 0xf7, 2);
 
     // initialized your accel to 2g (accel_confi_reg)
-    todo("setup accel with 2g");
+    // the testing code already calls the reset before init() so we don't do it here
+
+    // p.15 accel config, set bit [4:3] to 0 for 2g full-scale range
+    // other bits are for self-test which we don't activate 
+    imu_wr(addr, accel_config_reg, 0);
+
+    // p.13 configure low-pass filter, write DLPF_CFG=4 for bandwidth = 20 Hz
+    // imu_wr(addr, 0x1a, 0b100);
+
+    // p.39 enable fifo (global) bit 6 fifo_en
+    imu_wr(addr, USER_CTRL, bit_set(imu_rd(addr, USER_CTRL), 6));
+
+    // p.16 enable accel fifo (bit 3)
+    imu_wr(addr, 0x23, 0b00001000);
 
     output("accel_config_reg=%b\n", imu_rd(addr, accel_config_reg));
     return (accel_t) { .addr = addr, .g = g, .hz = 20 };
@@ -187,7 +208,12 @@ void mpu6050_reset(uint8_t addr) {
 
     // page 41: to reset device: set bit 7 = 1 in register
     // PWR_MGMT_1 (register 0x6b)
-    todo("reset device");
+    // p.41 reset accel register, put every interal registers to default value (bit 7)
+    imu_wr(addr, PWR_MGMT_1, bit_set(imu_rd(addr, PWR_MGMT_1), 7));
+
+    // wait until reset bit is cleared
+    // while (bit_get(imu_rd(addr, PWR_MGMT_1), 7));
+    trace("power mgt reset ok \n");
 
     // XXX: we should read different registers and see that they
     // went back to startup.
@@ -202,7 +228,10 @@ void mpu6050_reset(uint8_t addr) {
     // if you do *NOT* do this, then the device we have does not work.
     // according to my reading of the data sheet, the value of 0x6b should
     // be 0 after reset.  so i don't get this.
-    todo("clear sleep mode");
+    
+    // p.42 setting the CYCLE bit 5 to 1 will disable sleep
+    // imu_wr(addr, PWR_MGMT_1, bit_set(imu_rd(addr, PWR_MGMT_1), 5));
+    imu_wr(addr, PWR_MGMT_1, 0); // Wake up, constant run
 
     delay_ms(100);
 
@@ -212,7 +241,10 @@ void mpu6050_reset(uint8_t addr) {
     //   - fifo
     // not sure if redundant after device reset --- datasheet
     // unclear --- so we do to be sure.
-    todo("reset all these");
+
+    // p.39 bit 2 = fifo reset, 1 = master mode, 0 = sig cond
+    // it's ok to write 0 to fifo-en, i2c-mst-en, and i2c-if-dis
+    imu_wr(addr, USER_CTRL, 0);
 
     delay_ms(100);
 
@@ -220,7 +252,16 @@ void mpu6050_reset(uint8_t addr) {
     // (INT_ENABLE) after you config (p27):
     // - latch to be held high until cleared;
     // - read to clear it.
-    todo("enable IMU interrupts so you can tell that data is ready");
+
+    // latch high until clear 0x37 is INT_PIN_CFG (bit 5) and cleared when read (bit 4)
+    // imu_wr(addr, 0x37, bit_set(imu_rd(addr, 0x37), 5));
+    imu_wr(addr, 0x37, 0b11000);
+
+    // enable IMU interrupts so you can tell that data is ready (bit 0)
+    imu_wr(addr, INT_ENABLE, bit_set(imu_rd(addr, INT_ENABLE), 0));
+
+    // p.29 read to clear (bit 0)
+    imu_rd(addr, INT_STATUS);
 }
 
 // block until there is data and then return it (raw)
@@ -231,13 +272,16 @@ void mpu6050_reset(uint8_t addr) {
 // read them all at once for consistent
 // readings using autoincrement.
 imu_xyz_t accel_rd(const accel_t *h) {
-
     uint8_t addr = h->addr;
     uint8_t regs[6];
 
     // wait until data.
     while(!accel_has_data(h))
         ;
+    
+    // clear the flag (you don't have to if accel_has_data read from mpu reg)
+    // but necessary if read from gpio
+    imu_rd(h->addr, INT_STATUS);
 
     // read in from the IMU using imu_rd_n.
     //
@@ -260,7 +304,13 @@ imu_xyz_t accel_rd(const accel_t *h) {
     //  - if this doesn't work, read regs one at a time.
     //  - you'll have to comine the two 8-bit unsigned
     //    regs into a signed 16 bit number using <mg_raw>
-    todo("implement burst reads and return as unscaled x,y,z");
+    uint8_t v[6];
+
+    imu_rd_n(addr, accel_xout_h, v, 6);
+    // the order in fifo is according to register address
+    x = mg_raw(v[1], v[0]);
+    y = mg_raw(v[3], v[2]);
+    z = mg_raw(v[5], v[4]);
     
     return xyz_mk(x,y,z);
 }

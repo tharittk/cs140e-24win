@@ -1,5 +1,5 @@
 // engler: simplistic mpu6050 gyro driver code, mirrors
-// <driver-accel.c>.  
+// <driver-accel.c>.
 //  1. initializes gyroscope,
 //  2. prints N readings.
 //
@@ -14,7 +14,7 @@
 //  2. bit bang i2c
 //  3. multiple devices.
 //  4. extend the interface to give more control.
-//  
+//
 //
 // KEY: document why you are doing what you are doing.
 //  **** put page numbers for any device-specific things you do ***
@@ -24,8 +24,8 @@
 //  **** put page numbers for any device-specific things you do ***
 //  **** put page numbers for any device-specific things you do ***
 //  **** put page numbers for any device-specific things you do ***
-// 
-// also: a sentence or two will go a long way in a year when you want 
+//
+// also: a sentence or two will go a long way in a year when you want
 // to re-use the code.
 #include "rpi.h"
 #include "mpu-6050.h"
@@ -38,14 +38,14 @@ void notmain(void) {
     // from application note.
     uint8_t dev_addr = 0b1101000;
 
-    enum { 
-        WHO_AM_I_REG      = 0x75, 
-        WHO_AM_I_VAL = 0x68,       
+    enum {
+        WHO_AM_I_REG      = 0x75,
+        WHO_AM_I_VAL = 0x70,
     };
 
     uint8_t v = imu_rd(dev_addr, WHO_AM_I_REG);
     if(v != WHO_AM_I_VAL)
-        panic("Initial probe failed: expected %b (%x), have %b (%x)\n", 
+        panic("Initial probe failed: expected %b (%x), have %b (%x)\n",
             WHO_AM_I_VAL, WHO_AM_I_VAL, v, v);
     printk("SUCCESS: mpu-6050 acknowledged our ping: WHO_AM_I=%b!!\n", v);
 
