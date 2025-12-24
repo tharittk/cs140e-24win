@@ -89,6 +89,13 @@ enum {
     accel_zout_h = 0x3f,
     accel_zout_l = 0x40,
 
+    gyro_xout_h = 0x43,
+    gyro_xout_l = 0x44,
+    gyro_yout_h = 0x45,
+    gyro_yout_l = 0x46,
+    gyro_zout_h = 0x47,
+    gyro_zout_l = 0x48,
+
     // p 41
     PWR_MGMT_1 = 0x6b,
     // p 42
@@ -98,6 +105,12 @@ enum {
     INT_STATUS = 0x3a,
     // p 28
     INT_ENABLE = 0x38,
+
+    //p 44
+    FIFO_COUNT_H = 0x72,
+    FIFO_COUNT_L = 0x73,
+
+    FIFO_BUF = 0x74,
 };
 
 // returns a scaled milligauss value given the
@@ -138,7 +151,7 @@ int accel_has_data(const accel_t *h) {
 // i'd suggest playing w/ gdb or small C programs to see that what
 // C does matches your intuition.
 static short mg_raw(uint8_t lo, uint8_t hi) {
-    short combine = 0;
+    signed short combine = 0;
     combine |= (hi << 8);
     combine |= lo;
     return combine;
@@ -185,7 +198,7 @@ accel_t mpu6050_accel_init(uint8_t addr, unsigned accel_g) {
     imu_wr(addr, accel_config_reg, 0);
 
     // p.13 configure low-pass filter, write DLPF_CFG=4 for bandwidth = 20 Hz
-    // imu_wr(addr, 0x1a, 0b100);
+    // imu_wr(addr, CONFIG, 0b100);
 
     // p.39 enable fifo (global) bit 6 fifo_en
     imu_wr(addr, USER_CTRL, bit_set(imu_rd(addr, USER_CTRL), 6));
@@ -324,7 +337,7 @@ imu_xyz_t accel_rd(const accel_t *h) {
 // gyro registers.
 enum {
     // p13, p6
-    CONFIG = 28, 
+    CONFIG = 26, 
     // p14, p6
     GYRO_CONFIG = 29, 
 
@@ -413,14 +426,46 @@ gyro_t mpu6050_gyro_init(uint8_t addr, unsigned gyro_dps) {
     }
 
     // you'll need to set CONFIG (p13) and GYRO_CONFIG (p14)
-    todo("initialize the gyro");
+
+    unsigned fs_sel;
+    switch (dps){
+        case 250: fs_sel = 0; break;
+        case 500: fs_sel = 1; break;
+        case 1000: fs_sel = 2; break;
+        case 2000: fs_sel = 3; break;
+        default: panic("invalid dps: %b \n", dps);
+    }
+
+    // config ?
+    // imu_wr(addr, CONFIG, 0x03);
+
+    // p.14: set full-scale range bit[4:3]
+    trace("Check !: your code: fs_sel %d (looks like staff use 0) \n", fs_sel);
+    fs_sel = 0;
+    imu_wr(addr, gyro_config_reg, fs_sel<<3);
+
+    // p.39 global fifo enable bit 6
+    imu_wr(addr, USER_CTRL, bit_set(imu_rd(addr, USER_CTRL), 6));
+
+    // p.16 gyro fifo enable
+    imu_wr(addr, 0x23, 0b01110000);
+
     return (gyro_t) { .addr = addr, .dps = dps,  };
 }
 
 // use int or fifo to tell when data.
 int gyro_has_data(const gyro_t *h) {
-    todo("implement this");
-    return 1;
+    // same as accel
+    uint8_t ready = bit_get(imu_rd(h->addr, INT_STATUS), 0);
+    if (ready){
+        uint8_t count_h = imu_rd(h->addr, FIFO_COUNT_H);
+        uint8_t count_l = imu_rd(h->addr, FIFO_COUNT_L);
+        unsigned count = (count_h << 8) | count_l;
+        // gyro and accel read 6 bytes
+        return (count >= 6);
+    } else {
+        return 0;
+    }
 }
 
 // return a single raw gyro reading.
@@ -433,9 +478,33 @@ imu_xyz_t gyro_rd(const gyro_t *h) {
     while(!gyro_has_data(h))
         ;
 
-    int x=0,y=0,z=00;
+    int x=0,y=0,z=0;
 
     // you'll need to combine the 8-bit regs into a 16-bit using <mg_raw>
-    todo("implement this");
+    
+    // read to clear interrupt flag
+    imu_rd(addr, INT_STATUS);
+
+    uint8_t v[6];
+
+    imu_rd_n(addr, gyro_xout_h, v, 6);
+    // v[0] = imu_rd(addr, FIFO_BUF);
+    // v[1] = imu_rd(addr, FIFO_BUF);
+    // v[2] = imu_rd(addr, FIFO_BUF);
+    // v[3] = imu_rd(addr, FIFO_BUF);
+    // v[4] = imu_rd(addr, FIFO_BUF);
+    // v[5] = imu_rd(addr, FIFO_BUF);
+    // the order in fifo is according to register address
+    x = mg_raw(v[1], v[0]);
+    y = mg_raw(v[3], v[2]);
+    z = mg_raw(v[5], v[4]);
+
+
+    trace("reg[0]=%d \n", v[0]);
+    trace("reg[1]=%d \n", v[1]);
+    trace("reg[2]=%d \n", v[2]);
+    trace("reg[3]=%d \n", v[3]);
+    trace("reg[4]=%d \n", v[4]);
+    trace("reg[5]=%d \n", v[5]);
     return xyz_mk(x,y,z);
 }
