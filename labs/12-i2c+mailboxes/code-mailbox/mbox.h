@@ -28,7 +28,7 @@
 
 /*
     REGISTER	ADDRESS
-    Read	        0x2000B880
+    Read	        0x2000B880 // skip 3 bytes
     Poll	        0x2000B890
     Sender	        0x2000B894
     Status	        0x2000B898
