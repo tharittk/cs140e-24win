@@ -55,139 +55,114 @@ _Static_assert(offsetof(RPI_i2c_t, clock_delay) == 0x18, "wrong offset");
  */
 static volatile RPI_i2c_t *i2c = (void*)0x20804000; 	// BSC1
 
-static void i2c_prolog(void){
-	// transmit START
-	uint32_t old = GET32(i2c->control);
-	PUT32(i2c->control, old | (1 << 7));
-	// wait until transfer is no more active
-	while (GET32(i2c->status) & 0x1){
-		output("w");
-	}
-	// check error and read fifo is empty
-	uint32_t status = GET32(i2c->status);
-	char clkt_err = status & (1 << 9);
-	char err = status & (1 << 8);
-	assert (!clkt_err && !err);
-}
+#define C_START (1 << 7)
+#define C_ENB (1 << 15)
+#define C_CLEAR_FIFO (1 << 4)
+#define C_READ 1
+#define S_DONE (1 << 1)
+#define S_RXD (1 << 5) // FIFO has at least 1 byte
+#define S_TXD (1 << 4) // FIFO can accept data
+#define S_TA 1 // Transfer Active
+#define S_CLKT (1 << 9) // clock stretch timeout
+#define S_ERR (1 << 8) // Ack error
 
-static void i2c_prepare_rw(unsigned addr, unsigned nbytes){
-	uint32_t old = GET32(i2c->control);
-	// clear DONE field
-	PUT32(i2c->control, old | (1 << 1));
-
-	// 7-bit address
-	PUT32(i2c->dev_addr, addr);
-
-	// data length
-	PUT32(i2c->dlen, nbytes);
-}
-
-static void i2c_epilog(void){
-	// should DONE, and clear
-	assert(GET32(i2c->status) & (1 << 1));
-	PUT32(i2c->status, (1 << 1));
-
-	// check transfer is not active
-	assert(!(GET32(i2c->status) & 1));
-}
 
 // extend so this can fail.
 int i2c_write(unsigned addr, uint8_t data[], unsigned nbytes) {
-	i2c_prolog();
-	output("prolog ok \n");
+	output("in i2c write\n");
+	// addr and data size
+	PUT32(i2c->dev_addr, addr & 0x7f);
+	PUT32(i2c->dlen, nbytes);
+
+	// clear existing flag
+	// PUT32(i2c->status,  S_ERR | S_CLKT | S_DONE);
+
+	PUT32(i2c->control, C_ENB | C_START | C_CLEAR_FIFO);
+
+	// wait until transfer is no more active
+	// while (GET32(i2c->status) & S_TA)
+		// ;
 
 	// char txe = GET32(i2c->status) & (1 << 6);
 	// assert (txe);
 
-	i2c_prepare_rw(addr, nbytes);
-	output("prepare rw ok \n");
-
-	// 0 for WRITE
-	uint32_t old = GET32(i2c->control);
-	PUT32(i2c->control, old & ~0x1);
-
-	// start transfer
-	old = GET32(i2c->control);
-	PUT32(i2c->control, old | (1 << 7));
-
-	// wait until start
-	// while (!(GET32(i2c->status) & 1)){
-	// 	output(".");
-	// }
-
 	// write to target
-	unsigned i = 0;
-	for (unsigned i = 0; i < nbytes; ++i){
-		// wait until read FIFO has a space
-		while (!(GET32(i2c->status) & (1 << 4))){
-			output("..");
-			;
+	unsigned count = 0;
+	while (!(GET32(i2c->status) & S_DONE)){
+		output ("first inner write \n");
+		while (count < nbytes && (GET32(i2c->status) & S_TXD)){
+			PUT32(i2c->fifo, data[count++]);
+			output("write: %x \n", data[count-1]);
 		}
-		PUT32(i2c->fifo, data[i]);
 	}
 
-	i2c_epilog();
+	uint32_t status = GET32(i2c->status);
+	char clkt_err = status & S_CLKT;
+	char err = status & S_ERR;
+	char done = status & S_DONE;
+	char ta = status & S_TA;
+	assert (!clkt_err && !err && done && !ta);
+
 	return 1;
 }
 
 // extend so it returns failure.
 int i2c_read(unsigned addr, uint8_t data[], unsigned nbytes) {
-	i2c_prolog();
+	output("in i2c read\n");
 
-	char rd_fifo = GET32(i2c->status) & (1 << 5);
-	assert (!rd_fifo);
+	// address and data length
+	PUT32(i2c->dev_addr, addr & 0x7f);
+	PUT32(i2c->dlen, nbytes);
 
-	i2c_prepare_rw(addr, nbytes);
+	// clear flag
+	// PUT32(i2c->status,  S_ERR | S_CLKT | S_DONE);
 
-	// 1 for READ
-	uint32_t old = GET32(i2c->control);
-	PUT32(i2c->control, old | 1);
-
-	// start transfer
-	old = GET32(i2c->control);
-	PUT32(i2c->control, old | (1 << 7));
-
-	// wait until start
-	while (!(GET32(i2c->status) & 1))
-		;
+	// start a transfer
+	PUT32(i2c->control, C_ENB | C_START | C_READ | C_CLEAR_FIFO);
 
 	// read from target
-	unsigned i = 0;
-	for (unsigned i = 0; i < nbytes; ++i){
-		// wait until read FIFO has at least one byte
-		while (!(GET32(i2c->status) & (1 << 5)))
-			;
-		uint8_t d = GET32(i2c->fifo) & 0xff;
-		data[i] = d;
+	unsigned count = 0;
+	while (!(GET32(i2c->status) & S_DONE)){
+		output ("first inner read \n");
+		while (count < nbytes && (GET32(i2c->status) & S_RXD)){
+			uint8_t d = GET32(i2c->fifo) & 0xff;
+			data[count++] = d;
+			output("read: %x \n", d);
+		}
 	}
 
-	i2c_epilog();
+	// leftover data after DONE is set
+	while (count < nbytes && (GET32(i2c->status) & S_RXD)) {
+        data[count++] = GET32(i2c->fifo) & 0xFF;
+    }
 
-	// last one, send STOP
+	uint32_t status = GET32(i2c->status);
+	char clkt_err = status & S_CLKT;
+	char err = status & S_ERR;
+	char done = status & S_DONE;
+	char ta = status & S_TA;
+	assert (!clkt_err && !err && done && !ta);
 	return 1;
 }
 
 void i2c_init(void) {
 	// p102. gpio 2 set to alt0 (sda1)
 	gpio_set_function(2, GPIO_FUNC_ALT0);
+	gpio_set_pullup(2);
 	dev_barrier();
 
 	// gpio 3 set to alt0 (scl1)
 	gpio_set_function(3, GPIO_FUNC_ALT0);
+	gpio_set_pullup(3);
 	dev_barrier();
 
 	// p29. enable I2C
-	uint32_t c = 0;
-	c |= (1 << 15);
-
 	// p30. clear fifo
-	c |= (1 << 4);
-
-	PUT32(i2c->control, c);
-	// dev_barrier();
+	PUT32(i2c->control, C_ENB | C_CLEAR_FIFO);
+	dev_barrier();
 
 	// p31. clear status register
-	PUT32(i2c->status, 0);
+	PUT32(i2c->status,  S_ERR | S_CLKT | S_DONE);
 
 	// do sanity check
 	uint32_t div = GET32(i2c->clock_div) & 0xffff;
