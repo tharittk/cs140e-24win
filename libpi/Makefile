@@ -8,6 +8,8 @@
 SRC += src/gpio.c
 SRC += ../labs/8-uart/1-sw-uart-put8/sw-uart.c
 SRC += ../labs/8-uart/2-uart/uart.c
+# lab12 
+SRC += src/i2c.c
 
 # you would add the path to yours.
 # STAFF_OBJS  +=  ./staff-objs/uart.o

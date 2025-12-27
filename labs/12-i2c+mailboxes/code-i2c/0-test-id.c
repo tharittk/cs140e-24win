@@ -19,10 +19,11 @@ void notmain(void) {
 
     // from application note.
     uint8_t dev_addr = 0b1101000;
+    printk("dev addr: %x \n", dev_addr);
 
     enum {
         WHO_AM_I_REG      = 0x75,
-        WHO_AM_I_VAL = 0x68,
+        WHO_AM_I_VAL = 0x70,
     };
 
     uint8_t v = i2c_get_reg(dev_addr, WHO_AM_I_REG);
