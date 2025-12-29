@@ -9,6 +9,7 @@
 MK_FN(rfe_asm)
     mov sp, r0
     rfe sp
+    @ rfe r0 should work fine as well ?
     asm_not_reached();
 
 @ a trampoline that loads the stack pointer
@@ -26,7 +27,10 @@ MK_FN(rfe_trampoline_asm)
 @ tiny change: modify rfe_asm to deal with being 
 @ passed a 17-entry register array
 MK_FN(blk_rfe_asm)
-    asm_todo("implement this");
+    mov sp, r0
+    @ldmia sp, {r0-r14} @ disregard those r0-14
+    add sp, sp, #60 @ {pc, cpsr} are stored at higher address
+    rfe sp
     asm_not_reached();
 
 @ do not need to modify: same as original, so just
@@ -47,7 +51,10 @@ MK_FN(blk_trampoline_asm)
 @     code)
 @  2. does an rfe 
 MK_FN(switchto_user_asm)
-    asm_todo("implement this");
+    mov sp, r0
+    ldm sp, {r0-r14}^
+    add sp, sp, #60
+    rfe sp
     asm_not_reached();
 
 @ so we don't get linker errors 
