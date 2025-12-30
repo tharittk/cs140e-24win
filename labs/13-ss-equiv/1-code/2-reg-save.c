@@ -30,7 +30,7 @@ int do_syscall(uint32_t regs[17]) {
 
     for(unsigned i = 0; i < 17; i++)
         if(regs[i])
-            trace("reg[%d]=%x\n", i, regs[i]);
+            trace("reg[%d]=%x (addr: %x) \n", i, regs[i], &regs[i]);
 
     assert(sysno == 0);
     clean_reboot();

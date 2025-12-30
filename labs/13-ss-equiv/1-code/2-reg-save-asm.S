@@ -17,19 +17,39 @@ swi_trampoline:
     @ - r13(sp), r14(lr) are banked in USER, use caret ^
     @ - r15 is the pc of swi (currently saved as lr when swi is called), push r14_svc
     @ - r16 is cpsr (now SUPERVISOR), we need to pass the spsr_svc (USER)
-    @ - doing mrs r0, cpsr_svc, and push r0
-
-    asm_todo("implement this")
+    @ - doing mrs r0, spsr_svc, and push r0
+    @ - do this in reverse for stack semantic (at the end sp points to reg[0])
 
     @ sp should point to interrupt stack
+    mov sp, #INT_STACK_ADDR
 
+    @ make room for 17 regs
+    @ must do {r0-r12} first because these will get clobbered
 
-    @ save 17 registers on that with stm base_address = sp (decrease before write)
+    @ make room for r16, r15, r14, r13
+    sub sp, sp, #16
 
+    stmfd sp!, {r0-r12} @ share general-purpose registers
+
+    @ go back to original sp
+    mov sp, #INT_STACK_ADDR
+
+    mrs r0, spsr
+    stmfd sp!, {r0}     @ USER cpsr
+    
+    stmfd sp!, {r14}    @ pc saved at lr
+
+    stmfd sp, {r13, lr}^  @ USER sp and link reg `!` does not work with `^`
+    sub sp, sp, #8
+
+    @ point sp at regs[0], down 4x13 = 52 bytes (full descending)
+    sub sp, sp, #52
 
     @ the base address regs[0] moves to r0
+    mov r0, sp
 
     @ call do_syscall
+    bl do_syscall
 
     @ note: this trampoline does not resume.
     asm_not_reached();

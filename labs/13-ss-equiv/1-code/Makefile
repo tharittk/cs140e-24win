@@ -1,17 +1,17 @@
 BOOTLOADER=my-install
 
-PROGS  = 0-user-sp-lr.c
+# PROGS  = 0-user-sp-lr.c
 
 #PROGS += 2-simple-single-step.c
 #PROGS += 4-reg-restore.c
 #PROGS = 5-single-step-one.c
 #PROGS = 6-single-step-proc.c
 
-PROGS += 1-rfe-example.c
-PROGS += 1-rfe-blk.c
-PROGS += 1-rfe-switchto-user.c
+# PROGS += 1-rfe-example.c
+# PROGS += 1-rfe-blk.c
+# PROGS += 1-rfe-switchto-user.c
 
-PROGS += 2-reg-save.c
+# PROGS += 2-reg-save.c
 PROGS += 2-reg-save-full.c
 
 START_ASM = staff-start.S
