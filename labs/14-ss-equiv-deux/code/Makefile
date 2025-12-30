@@ -1,29 +1,27 @@
-# you'll implement <mini-watch.c> later in lab
 COMMON_SRC += mini-watch.c
 COMMON_SRC += mini-step.c
-COMMON_SRC += staff-full-except.c
+# this changed
+COMMON_SRC += staff-full-except.c 
+# new
+COMMON_SRC += switchto-asm.S
+# new
+COMMON_SRC += full-except-asm.S
 
-# you'll do these next week.
-STAFF_OBJS := staff-full-except-asm.o  staff-switchto-asm.o
+# you'll be replacing these.
+STAFF_OBJS := staff-full-except-asm.o  
+STAFF_OBJS += staff-switchto-asm.o
 
 # define this if you need to give the device for your pi
-TTYUSB =
+TTYUSB = 
 BOOTLOADER = my-install
 
 # set to 0 if you don't want it to run
-RUN=1
+RUN=0
 
 START_ASM = staff-start.S
 
-# simple watchpoint test
-# PROGS := 1-watchpt-test.c  2-brkpt-test.c
-# PROGS := 1-watchpt-test.c
-# PROGS := 5-mini-watch-test.c
-# PROGS := 6-mini-watch-byte-access.c
-# PROGS := 7-mini-step-trace-only.c
-# PROGS := 7-mini-step-diff.c
+# new test 8
+PROGS := $(wildcard ./[125678]-*.c)
 
-PROGS := $(wildcard ./[1234567]-*.c)
-
-GREP_STR := 'TRACE:\|THREAD:\|ERROR:\|PANIC:'
+GREP_STR := 'TRACE:\|THREAD:\|ERROR:\|PANIC:' 
 include $(CS140E_2024_PATH)/libpi/mk/Makefile.template-fixed
