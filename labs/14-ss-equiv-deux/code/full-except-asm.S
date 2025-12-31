@@ -160,9 +160,27 @@ data_abort_full:
 @ the pc in <regs> should point to the instruction after.
 syscall_full:
     @ initially we just forward to staff
-    b staff_syscall_trampoline_full
+    @ b staff_syscall_trampoline_full
 
-    asm_todo("implement: do not set sp!")
+    @ asm_todo("implement: do not set sp!")
+
+    @ currently you are at the SUPERVISOR Mode (enter via swi)
+
+    mrs r1, spsr
+    stmfd sp!, {r1}         @ regs[16]: USER cpsr
+    
+    stmfd sp!, {r14}        @ regs[15]: pc saved at lr
+
+    stmfd sp, {r13, lr}^    @ regs[14-13]
+    sub sp, sp, #8
+
+    stmfd sp, {r0-r12}^    @ regs[12-0]
+    sub sp, sp, #52
+
+    @ r0 is at regs[0], r1 is spsr, r2 is pc
+    mov r0, sp
+    @ r1 is already spsr
+    mov r2, lr
 
     bl syscall_full_except
     asm_not_reached();
