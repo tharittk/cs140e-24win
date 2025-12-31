@@ -41,7 +41,7 @@ MK_FN(switchto_user_asm)
     @ b staff_switchto_user_asm
 
     mov sp, r0          @ currently we are at non-user mode
-    ldm sp, {r0-r15}^   @ load the regs[i] value to USER's registers i
+    ldm sp, {r0-r14}^   @ load the regs[i] value to USER's registers i
     add sp, sp, #60     @ rfe expects {pc, cpsr}
     rfe sp
     asm_not_reached();
@@ -91,7 +91,11 @@ MK_FN(cswitchto_priv_asm)
 
 
     @ *old is at r0, *next is at r1
-    stm r0, {r0-r15}    @ save current registers to *old
+    stm r0, {r0-r14}    @ save current registers to *old
+    @ NOTE: You are calling context_switch(). The pc you should
+    @ save to old is what is in LR. If you save current pc to
+    @ old->regs[15], you will get infinite loop.
+    str lr, [r0, #60]   @ saved pc to be lr
     mrs r2, cpsr        @ don't forget the cpsr
     str r2, [r0, #64]   @ write cpsr to old[16]
 
@@ -110,13 +114,14 @@ MK_FN(cswitchto_priv_asm)
 @ and call the right switchto on <next>
 MK_FN(cswitchto_user_asm)
     @ initially just forward to ours.
-    b staff_cswitchto_priv_asm
+    @ b staff_cswitchto_priv_asm
 
     @ asm_todo("save the registers: identical to <switchto_priv_asm>")
     @ bl switchto_user_asm
 
     @ *old is at r0, *next is at r1
-    stm r0, {r0-r15}    @ save current registers to *old
+    stm r0, {r0-r14}    @ save current registers to *old
+    str lr, [r0, #60]   @ saved pc to be lr
     mrs r2, cpsr        @ don't forget the cpsr
     str r2, [r0, #64]   @ write cpsr to old[16]
 
@@ -124,3 +129,5 @@ MK_FN(cswitchto_user_asm)
     bl switchto_user_asm 
 
     asm_not_reached();
+
+    @ Test passed
