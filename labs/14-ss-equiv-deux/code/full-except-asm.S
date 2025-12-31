@@ -81,7 +81,7 @@ prefetch_handler_full:
     @ initially we just forward to staff
     @ b staff_prefetch_trampoline_full
 
-    @ currently you are at the ABORT mode
+    @ currently you are at the STH_NOT_USER mode
     mov sp, #INT_STACK_ADDR
     sub   lr, lr, #4
 
@@ -110,6 +110,8 @@ prefetch_handler_full:
 
     asm_not_reached();
 
+    @ Test passed
+
 @ NOTE: 
 @  - save registers assuming we come from user mode.
 @    <full-except.c> will patch up if needed.
@@ -117,11 +119,38 @@ prefetch_handler_full:
 @    faulted.
 data_abort_full:
     @ initially we just forward to staff
-    b staff_data_abort_trampoline_full
+    @ b staff_data_abort_trampoline_full
 
-    asm_todo("implement")
+    @ asm_todo("implement")
+    @ currently you are at the STH_NOT_USER mode
+    mov sp, #INT_STACK_ADDR
+    sub   lr, lr, #8
+
+    @ asm_todo("save all the regs in a reg_t on the stack") 
+    @ asm_todo("mov regs into r0, spsr into r1, pc into r2")
+    sub sp, sp, #16         @ make room for r16, r15, r14, r13
+
+    stmfd sp!, {r0-r12}     @ save r0-12
+
+    mov sp, #INT_STACK_ADDR @ back to original sp
+
+    mrs r1, spsr
+    stmfd sp!, {r1}         @ reg[16] saved USER's cpsr
+    stmfd sp!, {lr}         @ reg[15] pc
+
+    stmfd sp, {r13, lr}^    @ user sp and link reg
+    sub sp, sp, #8
+
+    sub sp, sp, #52
+
+    @ r0 is at regs[0], r1 is spsr, r2 is pc
+    mov r0, sp
+    @ r1 is already spsr
+    mov r2, lr
     bl data_abort_full_except
     asm_not_reached();
+
+    @ Test passed
 
 @ NOTE: 
 @  - assumes we come from user mode.
