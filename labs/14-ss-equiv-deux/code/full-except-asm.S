@@ -166,6 +166,9 @@ syscall_full:
 
     @ currently you are at the SUPERVISOR Mode (enter via swi)
 
+    @ Part 2: set sp
+    mov sp, #INT_STACK_ADDR
+
     mrs r1, spsr
     stmfd sp!, {r1}         @ regs[16]: USER cpsr
     
