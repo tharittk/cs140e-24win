@@ -15,21 +15,21 @@
 // arm1176.pdf: 3-149
 
 // define the following routines.
-#if 0
+#if 1
 // arm1176.pdf: 3-149
-void lockdown_index_set(uint32_t x);
-uint32_t lockdown_index_get(void);
+// void lockdown_index_set(uint32_t x);
+// uint32_t lockdown_index_get(void);
 
-void lockdown_va_set(uint32_t x);
-uint32_t lockdown_va_get(void);
+// void lockdown_va_set(uint32_t x);
+// uint32_t lockdown_va_get(void);
 
-void lockdown_pa_set(uint32_t x);
-uint32_t lockdown_pa_get(void);
+// void lockdown_pa_set(uint32_t x);
+// uint32_t lockdown_pa_get(void);
 
-void lockdown_attr_set(uint32_t x);
-uint32_t lockdown_attr_get(void);
+// void lockdown_attr_set(uint32_t x);
+// uint32_t lockdown_attr_get(void);
 
-void xlate_pa_set(uint32_t x);
+// void xlate_pa_set(uint32_t x);
 
 // routines to manually check that a translation
 // can succeed.  we use these to check that 
@@ -54,7 +54,15 @@ uint32_t xlate_pa_get(void);
 int tlb_contains_va(uint32_t *result, uint32_t va) {
     // 3-79
     assert(bits_get(va, 0,2) == 0);
-    return staff_tlb_contains_va(result, va);
+    // return staff_tlb_contains_va(result, va);
+
+    // Translate va->pa, privilege write permission (3-82)
+    // not sure about the privileddge / user
+    asm volatile("mcr p15, 0, %0, c7, c8, 1"::"r"(va):);
+    // read the pa value see if sucessful
+    asm volatile("mrc p15, 0, %0, c7, c4, 0":"=r"(*result)::);
+    // translation sucessful or not is in bit 0 (3-81)
+    return bit_get(*result, 0);
 }
 
 // map <va>-><pa> at TLB index <idx> with attributes <e>
@@ -63,8 +71,8 @@ void pin_mmu_sec(unsigned idx,
                 uint32_t pa,
                 pin_t e) {
 
-    staff_pin_mmu_sec(idx, va, pa, e);
-    return;
+    // staff_pin_mmu_sec(idx, va, pa, e);
+    // return;
 
     demand(idx < 8, lockdown index too large);
     // lower 20 bits should be 0.
@@ -76,13 +84,33 @@ void pin_mmu_sec(unsigned idx,
                 va,pa);
 
     debug("about to map %x->%x\n", va,pa);
-
-
     // these will hold the values you assign for the tlb entries.
-    uint32_t x, va_ent, pa_ent, attr;
+    uint32_t x=0, va_ent=0, pa_ent=0, attr=0;
 
-    // put your code here.
-    unimplemented();
+    // disable interrupt
+    asm volatile("cpsid aif":::);
+    // write an intended index to TLB lockdown index register
+    x = idx & 0b111;
+    asm volatile ("mcr p15, 5, %0, c15, c4, 2"::"r"(x):);
+    // write va to  TLB lockdown VA
+    va_ent = (va & 0xfff00000) | (e.G << 9) | (e.asid << 7);
+    // trace("va_ent %x \n", va_ent);
+    asm volatile("mcr p15, 5, %0, c15, c5, 2"::"r"(va_ent):);
+    // write attr to TLB lockdown attribute
+    attr = (e.dom << 7) | (e.mem_attr << 1);
+    asm volatile ("mcr p15, 5, %0, c15, c7, 2"::"r"(attr):);
+    // write pa to TLB lockdown PA
+    pa_ent = (pa & 0xfff00000) | (e.pagesize << 6) | (e.AP_perm << 1) | 1;
+    asm volatile ("mcr p15, 5, %0, c15, c6, 2"::"r"(pa_ent):);
+    // trace("pa_ent %x \n",pa_ent);
+    // trace("e.AP_perm: %b (expected 001)\n", e.AP_perm);
+    // trace("pa_ent (B) %b \n",pa_ent);
+    // barrier
+    asm volatile ("mcr p15, 0, %0, c7, c10, 4" :: "r" (0) : "memory"); // DSB
+    asm volatile ("mcr p15, 0, %0, c7, c5, 4"  :: "r" (0) : "memory"); // ISB/PrefetchFlush
+
+    // re-enable interrupt
+    asm volatile("cpsie aif":::);
 
 #if 0
     // put this back in when defined.
