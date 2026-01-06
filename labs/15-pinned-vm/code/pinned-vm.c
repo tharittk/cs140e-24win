@@ -60,10 +60,18 @@ int tlb_contains_va(uint32_t *result, uint32_t va) {
     // not sure about the privileddge / user
     asm volatile("mcr p15, 0, %0, c7, c8, 1"::"r"(va):);
     // read the pa value see if sucessful
-    asm volatile("mrc p15, 0, %0, c7, c4, 0":"=r"(*result)::);
-    // translation sucessful or not is in bit 0 (3-81)
-    return bit_get(*result, 0);
+    uint32_t par;
+    asm volatile("mrc p15, 0, %0, c7, c4, 0":"=r"(par)::);
+    // trace("contains ? pa result: %x (%b) \n", par, par);
+    // translation sucessful or not is in bit 0 (3-81) - 1 is abort
+    if(bit_get(par, 0))
+        return 0;
+    
+    // Reconstruct the PA: PAR has the section base, VA has the offset.
+    *result = (par & 0xfff00000) | (va & 0x000fffff);
+    return 1;
 }
+
 
 // map <va>-><pa> at TLB index <idx> with attributes <e>
 void pin_mmu_sec(unsigned idx,  
@@ -79,9 +87,9 @@ void pin_mmu_sec(unsigned idx,
     demand(bits_get(va, 0, 19) == 0, only handling 1MB sections);
     demand(bits_get(pa, 0, 19) == 0, only handling 1MB sections);
 
-    if(va != pa)
-        panic("for today's lab, va (%x) should equal pa (%x)\n",
-                va,pa);
+    // if(va != pa)
+    //     panic("for today's lab, va (%x) should equal pa (%x)\n",
+    //             va,pa);
 
     debug("about to map %x->%x\n", va,pa);
     // these will hold the values you assign for the tlb entries.
@@ -93,7 +101,8 @@ void pin_mmu_sec(unsigned idx,
     x = idx & 0b111;
     asm volatile ("mcr p15, 5, %0, c15, c4, 2"::"r"(x):);
     // write va to  TLB lockdown VA
-    va_ent = (va & 0xfff00000) | (e.G << 9) | (e.asid << 7);
+    // ASID is bits [7:0]
+    va_ent = (va & 0xfff00000) | (e.G << 9) | (e.asid);
     // trace("va_ent %x \n", va_ent);
     asm volatile("mcr p15, 5, %0, c15, c5, 2"::"r"(va_ent):);
     // write attr to TLB lockdown attribute
