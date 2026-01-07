@@ -60,7 +60,7 @@ int tlb_contains_va(uint32_t *result, uint32_t va) {
     // not sure about the privileddge / user
     asm volatile("mcr p15, 0, %0, c7, c8, 1"::"r"(va):);
     // read the pa value see if sucessful
-    uint32_t par;
+        uint32_t par;
     asm volatile("mrc p15, 0, %0, c7, c4, 0":"=r"(par)::);
     // trace("contains ? pa result: %x (%b) \n", par, par);
     // translation sucessful or not is in bit 0 (3-81) - 1 is abort
@@ -111,9 +111,6 @@ void pin_mmu_sec(unsigned idx,
     // write pa to TLB lockdown PA
     pa_ent = (pa & 0xfff00000) | (e.pagesize << 6) | (e.AP_perm << 1) | 1;
     asm volatile ("mcr p15, 5, %0, c15, c6, 2"::"r"(pa_ent):);
-    // trace("pa_ent %x \n",pa_ent);
-    // trace("e.AP_perm: %b (expected 001)\n", e.AP_perm);
-    // trace("pa_ent (B) %b \n",pa_ent);
     // barrier
     asm volatile ("mcr p15, 0, %0, c7, c10, 4" :: "r" (0) : "memory"); // DSB
     asm volatile ("mcr p15, 0, %0, c7, c5, 4"  :: "r" (0) : "memory"); // ISB/PrefetchFlush
@@ -167,7 +164,33 @@ static void *null_pt = 0;
 
 // fill this in based on the test code.
 void pin_mmu_init(uint32_t domain_reg) {
-    staff_pin_mmu_init(domain_reg);
+    // staff_pin_mmu_init(domain_reg);
+
+    // follow (6-9)
+    uint32_t sbz = 0;
+    // b4-45 TLB function - invalidate unitfied TLB (botth I, D)
+    asm volatile ("mcr p15, 0, %0, c8, c7, 0"::"r"(sbz):);
+
+    // set first-level (and second-level) deoscriptor page table (B4-41)
+    asm volatile ("mcr p15, 0 , %0, c2, c0, 2"::"r"(sbz):); // TLB control reg (16 KB, do walk on miss - 3-61)
+    uint32_t tlb_base0 = 0x4000;
+    asm volatile ("mcr p15, 0, %0, c2, c0, 0"::"r"(tlb_base0):); // base at 0x4000, other bits are default on reset
+
+
+    // disable and invaliate I, D cache (3-74)
+    asm volatile ("mcr p15, 0, %0, c7, c14, 0"::"r"(sbz):); // clean and invalidate D-cache
+    asm volatile ("mcr p15, 0, %0, c7, c5, 0"::"r"(sbz):); // invalidate I-cache nad flush branch target cache
+
+    // set d[dom_reg] = client (01, others = ?) or just mcr to be domain reg (B4-42, 3-63)
+    asm volatile ("mcr p15, 0, %0, c3, c0, 0"::"r"(domain_reg):);
+
+    // turn on MMU, table 3-39 (3-47) or B4-40 with RAW
+    uint32_t control_reg1;
+    asm volatile ("mrc p15, 0, %0, c1, c0, 0":"=r"(control_reg1)::);
+    bit_set(control_reg1, 0);
+    asm volatile ("mcr p15, 0, %0, c1, c0, 0"::"r"(control_reg1):);
+
+    // may turn on I-D cache
     return;
 }
 
