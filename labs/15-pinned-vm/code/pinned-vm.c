@@ -216,7 +216,7 @@ void pin_mmu_init(uint32_t domain_reg) {
     // turn on MMU via RMW table 3-39 (3-47) or B4-40
     uint32_t control_reg1;
     asm volatile ("mrc p15, 0, %0, c1, c0, 0":"=r"(control_reg1):: "memory");
-    bit_set(control_reg1, 0);
+    control_reg1 = bit_set(control_reg1, 0);
     asm volatile ("mcr p15, 0, %0, c1, c0, 0"::"r"(control_reg1): "memory");
 
     // may turn on I-D cache
