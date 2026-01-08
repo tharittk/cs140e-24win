@@ -166,25 +166,24 @@ static void *null_pt = 0;
 void pin_mmu_init(uint32_t domain_reg) {
     // staff_pin_mmu_init(domain_reg);
 
-    // follow (6-9)
+    // Steps from (6-9)
     uint32_t sbz = 0;
-    // b4-45 TLB function - invalidate unitfied TLB (botth I, D)
+    // invalidate unitfied TLB both I, D - (B4-45)
     asm volatile ("mcr p15, 0, %0, c8, c7, 0"::"r"(sbz):);
 
     // set first-level (and second-level) deoscriptor page table (B4-41)
-    asm volatile ("mcr p15, 0 , %0, c2, c0, 2"::"r"(sbz):); // TLB control reg (16 KB, do walk on miss - 3-61)
+    asm volatile ("mcr p15, 0 , %0, c2, c0, 2"::"r"(sbz):); // TLB control reg 16 KB, do walk on miss - (3-61)
     uint32_t tlb_base0 = 0x4000;
     asm volatile ("mcr p15, 0, %0, c2, c0, 0"::"r"(tlb_base0):); // base at 0x4000, other bits are default on reset
-
 
     // disable and invaliate I, D cache (3-74)
     asm volatile ("mcr p15, 0, %0, c7, c14, 0"::"r"(sbz):); // clean and invalidate D-cache
     asm volatile ("mcr p15, 0, %0, c7, c5, 0"::"r"(sbz):); // invalidate I-cache nad flush branch target cache
 
-    // set d[dom_reg] = client (01, others = ?) or just mcr to be domain reg (B4-42, 3-63)
+    // set access control for 16 domains via 32-bit domain_reg
     asm volatile ("mcr p15, 0, %0, c3, c0, 0"::"r"(domain_reg):);
 
-    // turn on MMU, table 3-39 (3-47) or B4-40 with RAW
+    // turn on MMU via RMW table 3-39 (3-47) or B4-40
     uint32_t control_reg1;
     asm volatile ("mrc p15, 0, %0, c1, c0, 0":"=r"(control_reg1)::);
     bit_set(control_reg1, 0);
@@ -196,5 +195,26 @@ void pin_mmu_init(uint32_t domain_reg) {
 
 void pin_mmu_switch(uint32_t pid, uint32_t asid) {
     assert(null_pt);
-    staff_mmu_set_ctx(pid, asid, null_pt);
+    // staff function to replace
+    // staff_mmu_set_ctx(pid, asid, null_pt);
+
+    //  B2-25, do the asid<-0, prefetch flush, change TTBR,, prefetch flush, change asid to new val
+    uint32_t sbz = 0;
+
+    // set ASID = 0 first to prevent alias (3-128)
+    uint32_t tmp = pid << 8; // ASID = 0, PRODIC = pid
+    asm volatile ("mcr p15, 0, %0, c13, c0, 1"::"r"(tmp): "memory");
+
+    // prefetct flush
+    asm volatile ("mcr p15, 0, %0, c7, c5, 4"::"r"(sbz): "memory");
+
+    // change TTBR (set to null_pt)
+    asm volatile ("mcr p15, 0, %0, c2, c0, 0"::"r"(null_pt): "memory");
+
+    // prefetch flush
+    asm volatile ("mcr p15, 0, %0, c7, c5, 4"::"r"(sbz): "memory");
+
+    // set asid to asid
+    uint32_t proc_asid = (pid << 8) | (asid & 0xff);
+    asm volatile ("mcr p15, 0, %0, c13, c0, 1"::"r"(proc_asid): "memory");
 }
