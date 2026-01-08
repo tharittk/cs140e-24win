@@ -17,17 +17,47 @@
 // define the following routines.
 #if 1
 // arm1176.pdf: 3-149
-// void lockdown_index_set(uint32_t x);
-// uint32_t lockdown_index_get(void);
+void lockdown_index_set(uint32_t x) {
+    x &= 0b111;
+    asm volatile ("mcr p15, 5, %0, c15, c4, 2"::"r"(x):"memory");
+}
 
-// void lockdown_va_set(uint32_t x);
-// uint32_t lockdown_va_get(void);
+uint32_t lockdown_index_get(void) {
+    uint32_t ret;
+    asm volatile ("mrc p15, 5, %0, c15, c4, 2":"=r"(ret)::"memory");
+    return ret;
+}
 
-// void lockdown_pa_set(uint32_t x);
-// uint32_t lockdown_pa_get(void);
+void lockdown_va_set(uint32_t x) {
+    // assume x has proper bits set
+    asm volatile ("mcr p15, 5, %0, c15, c5, 2"::"r"(x): "memory");
+}
 
-// void lockdown_attr_set(uint32_t x);
-// uint32_t lockdown_attr_get(void);
+uint32_t lockdown_va_get(void) {
+    uint32_t va;
+    asm volatile ("mrc p15, 5, %0, c15, c5, 2":"=r"(va):: "memory");
+    return va;
+}
+
+void lockdown_pa_set(uint32_t x) {
+    asm volatile ("mcr p15, 5, %0, c15, c6, 2"::"r"(x): "memory");
+}
+
+uint32_t lockdown_pa_get(void) {
+    uint32_t pa;
+    asm volatile ("mrc p15, 5, %0, c15, c6, 2":"=r"(pa):: "memory");
+    return pa;
+}
+
+void lockdown_attr_set(uint32_t x) {
+    asm volatile ("mcr p15, 5, %0, c15, c7, 2"::"r"(x): "memory");
+}
+
+uint32_t lockdown_attr_get(void) {
+    uint32_t attr;
+    asm volatile ("mrc p15, 5, %0, c15, c7, 2":"=r"(attr):: "memory");
+    return attr;
+}
 
 // void xlate_pa_set(uint32_t x);
 
@@ -58,10 +88,10 @@ int tlb_contains_va(uint32_t *result, uint32_t va) {
 
     // Translate va->pa, privilege write permission (3-82)
     // not sure about the privileddge / user
-    asm volatile("mcr p15, 0, %0, c7, c8, 1"::"r"(va):);
+    asm volatile("mcr p15, 0, %0, c7, c8, 1"::"r"(va): "memory");
     // read the pa value see if sucessful
         uint32_t par;
-    asm volatile("mrc p15, 0, %0, c7, c4, 0":"=r"(par)::);
+    asm volatile("mrc p15, 0, %0, c7, c4, 0":"=r"(par):: "memory");
     // trace("contains ? pa result: %x (%b) \n", par, par);
     // translation sucessful or not is in bit 0 (3-81) - 1 is abort
     if(bit_get(par, 0))
@@ -99,18 +129,18 @@ void pin_mmu_sec(unsigned idx,
     asm volatile("cpsid aif":::);
     // write an intended index to TLB lockdown index register
     x = idx & 0b111;
-    asm volatile ("mcr p15, 5, %0, c15, c4, 2"::"r"(x):);
+    asm volatile ("mcr p15, 5, %0, c15, c4, 2"::"r"(x): "memory");
     // write va to  TLB lockdown VA
     // ASID is bits [7:0]
     va_ent = (va & 0xfff00000) | (e.G << 9) | (e.asid);
     // trace("va_ent %x \n", va_ent);
-    asm volatile("mcr p15, 5, %0, c15, c5, 2"::"r"(va_ent):);
+    asm volatile("mcr p15, 5, %0, c15, c5, 2"::"r"(va_ent): "memory");
     // write attr to TLB lockdown attribute
     attr = (e.dom << 7) | (e.mem_attr << 1);
-    asm volatile ("mcr p15, 5, %0, c15, c7, 2"::"r"(attr):);
+    asm volatile ("mcr p15, 5, %0, c15, c7, 2"::"r"(attr): "memory");
     // write pa to TLB lockdown PA
     pa_ent = (pa & 0xfff00000) | (e.pagesize << 6) | (e.AP_perm << 1) | 1;
-    asm volatile ("mcr p15, 5, %0, c15, c6, 2"::"r"(pa_ent):);
+    asm volatile ("mcr p15, 5, %0, c15, c6, 2"::"r"(pa_ent): "memory");
     // barrier
     asm volatile ("mcr p15, 0, %0, c7, c10, 4" :: "r" (0) : "memory"); // DSB
     asm volatile ("mcr p15, 0, %0, c7, c5, 4"  :: "r" (0) : "memory"); // ISB/PrefetchFlush
@@ -169,25 +199,25 @@ void pin_mmu_init(uint32_t domain_reg) {
     // Steps from (6-9)
     uint32_t sbz = 0;
     // invalidate unitfied TLB both I, D - (B4-45)
-    asm volatile ("mcr p15, 0, %0, c8, c7, 0"::"r"(sbz):);
+    asm volatile ("mcr p15, 0, %0, c8, c7, 0"::"r"(sbz): "memory");
 
     // set first-level (and second-level) deoscriptor page table (B4-41)
-    asm volatile ("mcr p15, 0 , %0, c2, c0, 2"::"r"(sbz):); // TLB control reg 16 KB, do walk on miss - (3-61)
+    asm volatile ("mcr p15, 0 , %0, c2, c0, 2"::"r"(sbz): "memory"); // TLB control reg 16 KB, do walk on miss - (3-61)
     uint32_t tlb_base0 = 0x4000;
-    asm volatile ("mcr p15, 0, %0, c2, c0, 0"::"r"(tlb_base0):); // base at 0x4000, other bits are default on reset
+    asm volatile ("mcr p15, 0, %0, c2, c0, 0"::"r"(tlb_base0): "memory"); // base at 0x4000, other bits are default on reset
 
     // disable and invaliate I, D cache (3-74)
-    asm volatile ("mcr p15, 0, %0, c7, c14, 0"::"r"(sbz):); // clean and invalidate D-cache
-    asm volatile ("mcr p15, 0, %0, c7, c5, 0"::"r"(sbz):); // invalidate I-cache nad flush branch target cache
+    asm volatile ("mcr p15, 0, %0, c7, c14, 0"::"r"(sbz): "memory"); // clean and invalidate D-cache
+    asm volatile ("mcr p15, 0, %0, c7, c5, 0"::"r"(sbz): "memory"); // invalidate I-cache nad flush branch target cache
 
     // set access control for 16 domains via 32-bit domain_reg
-    asm volatile ("mcr p15, 0, %0, c3, c0, 0"::"r"(domain_reg):);
+    asm volatile ("mcr p15, 0, %0, c3, c0, 0"::"r"(domain_reg): "memory");
 
     // turn on MMU via RMW table 3-39 (3-47) or B4-40
     uint32_t control_reg1;
-    asm volatile ("mrc p15, 0, %0, c1, c0, 0":"=r"(control_reg1)::);
+    asm volatile ("mrc p15, 0, %0, c1, c0, 0":"=r"(control_reg1):: "memory");
     bit_set(control_reg1, 0);
-    asm volatile ("mcr p15, 0, %0, c1, c0, 0"::"r"(control_reg1):);
+    asm volatile ("mcr p15, 0, %0, c1, c0, 0"::"r"(control_reg1): "memory");
 
     // may turn on I-D cache
     return;
@@ -217,4 +247,48 @@ void pin_mmu_switch(uint32_t pid, uint32_t asid) {
     // set asid to asid
     uint32_t proc_asid = (pid << 8) | (asid & 0xff);
     asm volatile ("mcr p15, 0, %0, c13, c0, 1"::"r"(proc_asid): "memory");
+}
+
+
+void lockdown_print_entry(unsigned idx) {
+        trace("   idx=%d\n", idx);
+        lockdown_index_set(idx);
+        uint32_t va_ent = lockdown_va_get();
+        uint32_t pa_ent = lockdown_pa_get();
+        unsigned v = bit_get(pa_ent, 0);
+    
+        if(!v) {
+            trace("     [invalid entry %d]\n", idx);
+            return;
+        }
+    
+        // 3-149
+        uint32_t va, G, asid;
+        va = va_ent >> 12; G = (va_ent >> 9) & 1; asid = (va_ent & 0xff) ;
+        trace("     va_ent=%x: va=%x|G=%d|ASID=%d\n",
+            va_ent, va, G, asid);
+    
+        // 3-150
+        uint32_t pa, nsa, nstid, size, apx;
+        pa = pa_ent >> 12; nsa = (pa_ent >> 9) & 1; nstid = (pa_ent >> 8) & 1;
+        size = (pa_ent >> 6) & 0b11; apx = (pa_ent >> 1) & 0b111;
+        trace("     pa_ent=%x: pa=%x|nsa=%d|nstid=%d|size=%b|apx=%b|v=%d\n",
+                    pa_ent, pa, nsa,nstid,size, apx,v);
+    
+        // 3-151
+        uint32_t dom, xn, tex, C, B;
+        uint32_t attr = lockdown_attr_get(); 
+        dom = (attr >> 7) & 0xf; xn = (attr >> 6) & 1; tex = (attr >> 3) & 0b111;
+        C = (attr >> 2) & 1; B = (attr > 1) & 1;
+
+        trace("     attr=%x: dom=%d|xn=%d|tex=%b|C=%d|B=%d\n",
+                attr, dom,xn,tex,C,B);
+}
+    
+void lockdown_print_entries(const char *msg) {
+    trace("-----  <%s> ----- \n", msg);
+    trace("  pinned TLB lockdown entries:\n");
+    for(int i = 0; i < 8; i++)
+        lockdown_print_entry(i);
+    trace("----- ---------------------------------- \n");
 }
