@@ -194,36 +194,54 @@ static void *null_pt = 0;
 
 // fill this in based on the test code.
 void pin_mmu_init(uint32_t domain_reg) {
-    // staff_pin_mmu_init(domain_reg);
 
     // Steps from (6-9)
-    uint32_t sbz = 0;
-    // invalidate unitfied TLB both I, D - (B4-45)
-    asm volatile ("mcr p15, 0, %0, c8, c7, 0"::"r"(sbz): "memory");
-
-    // set first-level (and second-level) deoscriptor page table (B4-41)
-    asm volatile ("mcr p15, 0 , %0, c2, c0, 2"::"r"(sbz): "memory"); // TLB control reg 16 KB, do walk on miss - (3-61)
-    uint32_t tlb_base0 = 0x4000;
-    asm volatile ("mcr p15, 0, %0, c2, c0, 0"::"r"(tlb_base0): "memory"); // base at 0x4000, other bits are default on reset
-
-    // disable and invaliate I, D cache (3-74)
-    asm volatile ("mcr p15, 0, %0, c7, c14, 0"::"r"(sbz): "memory"); // clean and invalidate D-cache
-    asm volatile ("mcr p15, 0, %0, c7, c5, 0"::"r"(sbz): "memory"); // invalidate I-cache nad flush branch target cache
+    uint32_t zero = 0;
+    // Invalidate Caches and TLB (B4-45)
+    asm volatile ("mcr p15, 0, %0, c7, c7, 0" :: "r" (zero)); // Invalidate Caches
+    asm volatile ("mcr p15, 0, %0, c8, c7, 0" :: "r" (zero)); // Invalidate TLB
+    asm volatile ("mcr p15, 0, %0, c7, c10, 4" :: "r" (zero) : "memory"); // DSB
 
     // set access control for 16 domains via 32-bit domain_reg
-    asm volatile ("mcr p15, 0, %0, c3, c0, 0"::"r"(domain_reg): "memory");
+    asm volatile ("mcr p15, 0, %0, c3, c0, 0"::"r"(domain_reg));
+
+    // from 1-test-basic.c
+    null_pt = kmalloc_aligned(4096*4, 1<<14);
+    assert((uint32_t)null_pt % (1<<14) == 0);
+    memset(null_pt, 0, 4096*4);
+    // null_pt[0] = 
+    // trace("null_pt: %x \n", null_pt);
+    
+    // set first-level (and second-level) deoscriptor page table (B4-41)
+    asm volatile ("mcr p15, 0 , %0, c2, c0, 2"::"r"(zero)); // TLB control reg 16 KB, do walk on miss - (3-61)
+    asm volatile ("mcr p15, 0, %0, c2, c0, 0"::"r"(null_pt)); // tlb 0
+    asm volatile ("mcr p15, 0, %0, c2, c0, 1"::"r"(null_pt)); // tlb 1
+
+    // disable and invaliate I, D cache (3-74)
+    asm volatile ("mcr p15, 0, %0, c7, c14, 0"::"r"(zero)); // clean and invalidate D-cache
+    asm volatile ("mcr p15, 0, %0, c7, c5, 0"::"r"(zero)); // invalidate I-cache nad flush branch target cache
 
     // turn on MMU via RMW table 3-39 (3-47) or B4-40
-    uint32_t control_reg1;
-    asm volatile ("mrc p15, 0, %0, c1, c0, 0":"=r"(control_reg1):: "memory");
-    control_reg1 = bit_set(control_reg1, 0);
-    asm volatile ("mcr p15, 0, %0, c1, c0, 0"::"r"(control_reg1): "memory");
+    uint32_t control;
+    asm volatile ("mrc p15, 0, %0, c1, c0, 0" : "=r" (control));
+    control |= 0x1;    // Bit 0: MMU enable
+    control |= 0x1000; // Bit 12: I-cache enable
+    control |= 0x4;    // Bit 2: D-cache enable
+    
+    // asm volatile ("mcr p15, 0, %0, c1, c0, 0" :: "r" (control) : "memory");
+
+    // barrier
+    asm volatile ("mcr p15, 0, %0, c7, c10, 4" :: "r" (0) : "memory"); // DSB
+    asm volatile ("mcr p15, 0, %0, c7, c5, 4"  :: "r" (0) : "memory"); // ISB/PrefetchFlush
 
     // may turn on I-D cache
+    trace("pin_mmu_init ... done\n");
     return;
 }
 
 void pin_mmu_switch(uint32_t pid, uint32_t asid) {
+
+    trace("in switch...null_pt: %x \n", null_pt);
     assert(null_pt);
     // staff function to replace
     // staff_mmu_set_ctx(pid, asid, null_pt);
