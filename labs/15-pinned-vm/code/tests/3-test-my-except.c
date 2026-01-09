@@ -8,29 +8,39 @@
 
 enum { OneMB = 1024*1024};
 
-static unsigned d = 8; // Testing domain id
+static unsigned dom_heap = 8; // Testing domain id
 
 
 static void inline remove_permission() {
     uint32_t domains;
     // Read-modify-write, 3-63
     asm volatile ("mrc p15, 0, %0, c3, c0, 0":"=r"(domains)::"memory");
-    assert (((domains >> (2 * d)) & 0b11) == 0b11); // we enabled as manager previously
+    assert (((domains >> (2 * dom_heap)) & 0b11) == DOM_client); // we enabled as client previously
     // disable it
-    domains = bits_clr(domains, 2*d, 2*d + 1);
+    domains = bits_clr(domains, 2*dom_heap, 2*dom_heap + 1);
     asm volatile ("mcr p15, 0, %0, c3, c0, 0"::"r"(domains):"memory");
+    trace("remove permission %b \n", (domains >> (2*dom_heap)) & 0b11);
 }
 
 static void inline enable_permission () {
     uint32_t domains;
     // Read-modify-write, 3-63
     asm volatile ("mrc p15, 0, %0, c3, c0, 0":"=r"(domains)::"memory");
-    assert (((domains >> (2 * d)) & 0b11) == 0); // we disabled access previously
-    // re-enable as Manager ?
-    domains |= (0b11 << (2 * d));
+    assert (((domains >> (2 * dom_heap)) & 0b11) == 0); // we disabled access previously
+    // re-enable as client
+    domains |= (DOM_client << (2 * dom_heap));
     asm volatile ("mcr p15, 0, %0, c3, c0, 0"::"r"(domains):"memory");
+
+    trace("enable permission %b \n", (domains >> (2*dom_heap)) & 0b11);
 }
 
+
+static void prefetch_abort_handler (regs_t *r) {
+    trace("PREFETCH FAULT DETECTED \n");
+    enable_permission();   
+
+    return;
+}
 
 // a trivial fault handler that checks that we got the fault
 // we expected.
@@ -42,6 +52,10 @@ static void fault_handler(regs_t *r) {
 
     // print pc (? means pc that causes fault), ARMv6 "reason" for the fault (dfsr)
     trace("FAULT DETECTED: fault_addr: %x \n", fault_addr);
+
+    // uint32_t pc;
+    // asm volatile ("mov %0, lr":"=r"(pc)::"memory");
+    // trace("FAULT DETECTED: pc (saved lr): %x \n", r[15]);
 
     // b4-43
     uint32_t dfsr;
@@ -129,26 +143,23 @@ void notmain(void) {
 
     // if we are correct this will never get accessed.
     // since all valid entries are pinned.
-    void *null_pt = kmalloc_aligned(4096*4, 1<<14);
-    assert((uint32_t)null_pt % (1<<14) == 0);
-
-    // initialize everything, after bootup.
-    staff_mmu_init();
-
-    // definitions in <pinned-vm.h>
-    uint32_t AXP = 0;
-    uint32_t AP = 1;
-    uint32_t no_user = AXP << 2 | 1; // no access user (privileged only)
-    assert(perm_rw_priv == no_user);
-
-    // current index into the 8 pinned entries in tlb.
-    unsigned idx = 0;
+    // void *null_pt = kmalloc_aligned(4096*4, 1<<14);
+    // assert((uint32_t)null_pt % (1<<14) == 0);
 
     // armv6 has 16 different domains with their own privileges.
     // just pick one for the kernel.
     enum { 
         dom_kern = 1, // domain id for kernel
     };          
+
+    // initialize everything, after bootup.
+    uint32_t domain_reg = (DOM_client << (2*dom_heap)) | (DOM_client << (2*dom_kern));
+    pin_mmu_init(domain_reg);
+
+    // current index into the 8 pinned entries in tlb.
+    unsigned idx = 0;
+
+    uint32_t no_user = perm_rw_priv;
 
     // ******************************************************
     // 2. setup device memory.
@@ -164,77 +175,40 @@ void notmain(void) {
 
     // ******************************************************
     // 3. setup kernel memory: 
-
+    //
     // protection: same as device.
     // memory rules: uncached access.
     pin_t kern = pin_mk_global(dom_kern, no_user, MEM_uncached);
+    pin_t heap_ctl = pin_mk_global(dom_heap, no_user, MEM_uncached);
 
-    pin_mmu_sec(idx++, 0, 0, kern);                    // tlb 3
-    pin_mmu_sec(idx++, OneMB, OneMB, kern);            // tlb 4
+    pin_mmu_sec(idx++, 0, 0, kern);                         // tlb 3
+    pin_mmu_sec(idx++, OneMB, OneMB, heap_ctl);             // tlb 4 (heap)
 
     // now map kernel stack (or nothing will work)
     uint32_t kern_stack = STACK_ADDR-OneMB;
-    pin_mmu_sec(idx++, kern_stack, kern_stack, kern);   // tlb 5
+    pin_mmu_sec(idx++, kern_stack, kern_stack, kern);       // tlb 5
     uint32_t except_stack = INT_STACK_ADDR-OneMB;
+    pin_mmu_sec(idx++, except_stack, except_stack, kern);   // tlb 6
 
-    pin_mmu_sec(idx++, except_stack, except_stack, kern);
 
-    // ******************************************************
-    // 4. setup vm hardware.
-    //  - page table, asid, pid.
-    //  - domain permissions.
+    lockdown_print_entries("about to turn on first time");
 
-    // b4-42: give permissions for all domains.
-    staff_domain_access_ctrl_set(DOM_client << dom_kern*2); 
-
-    // set address space id, page table, and pid.
-    // note:
-    //  - pid never matters, it's just to help the os.
-    //  - asid doesn't matter for this test b/c all entries 
-    //    are global
-    //  - the page table is empty (since pinning) and is
-    //    just to catch errors.
-    enum { ASID = 1, PID = 128 };
-    staff_mmu_set_ctx(PID, ASID,null_pt);
-
-    // if you want to see the lockdown entries.
-    // lockdown_print_entries("about to turn on first time");
-
-    // ******************************************************
-    // 5. turn it on/off, checking that it worked.
-    trace("about to enable\n");
-    for(int i = 0; i < 10; i++) {
-        staff_mmu_enable();
-
-        if(mmu_is_enabled())
-            trace("MMU ON: hello from virtual memory!  cnt=%d\n", i);
-        else
-            panic("MMU is not on?\n");
-
-        staff_mmu_disable();
-        assert(!mmu_is_enabled());
-        trace("MMU is off!\n");
-    }
-
-    // ******************************************************
-    // 6. setup exception handling and make sure we get a fault.
-
-    // just like last lab.  setup a data abort handler.
     full_except_install(0);
     full_except_set_data_abort(fault_handler);
+    full_except_set_prefetch(prefetch_abort_handler);
 
-    // the address we will write to (2MB) we know this is not mapped.
-    illegal_addr = OneMB + OneMB;
+    pin_mmu_enable();
 
-    // this <PUT32> should "work" since vm is off.
-    assert(!mmu_is_enabled());
-    PUT32(illegal_addr, 0xdeadbeef);
-    trace("we wrote without vm: got %x\n", GET32(illegal_addr));
-    assert(GET32(illegal_addr) == 0xdeadbeef);
+    // Remove permission at heap and do the lead via GET32
+    remove_permission();
+    uint32_t heap_addr = OneMB + 0x4;
+    GET32(heap_addr);
+    
+    // when returned, the permission is already re-enable
+    remove_permission();
+    PUT32(heap_addr, 99);
 
-    // this should fault.
-    staff_mmu_enable();
-    assert(mmu_is_enabled());
-    PUT32(illegal_addr, 0xdeadbeef);
-    panic("should not reach here\n");
+    remove_permission();
+    asm volatile ("blx %0"::"r"(heap_addr): "memory");
+    clean_reboot();
 }
