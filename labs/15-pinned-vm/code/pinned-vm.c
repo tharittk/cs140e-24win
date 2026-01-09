@@ -128,8 +128,6 @@ void pin_mmu_sec(unsigned idx,
     // write va to  TLB lockdown VA
     // ASID is bits [7:0]
     va_ent = (va & 0xfff00000) | (e.G << 9) | (e.asid);
-
-    // trace("va_ent %x \n", va_ent);
     asm volatile("mcr p15, 5, %0, c15, c5, 2"::"r"(va_ent): "memory");
     
     // write attr to TLB lockdown attribute
@@ -220,7 +218,10 @@ void pin_mmu_init(uint32_t domain_reg) {
 
     // Don't do this yet. Init only set-up but not immediately enable
     // we haven't mapped va->pa for any register yet. Turning this on right away will at least
-    // make the instruction points to the undefined place - and hence, prefetch abort
+    // make the instruction points to the undefined place - and hence, the following abort:
+    // prefecth abort: the kernel code (0x0 - 0x100000) has not been mapped and so pc (now va) cannot be mapped
+    // data abort: stack has not been mapped. any asm push, pop will caues data abort
+    // peripheral cannot communicate (previoysly without mmu, addr = pa so it works but now need a map va = pa (identity))
     
     // turn on MMU via RMW table 3-39 (3-47) 
     // uint32_t control;

@@ -99,6 +99,8 @@ void notmain(void) {
 
     // Q1: if you uncomment this, what happens / why?
     // kern = pin_mk_global(dom_kern, perm_ro_priv, MEM_uncached);
+    // Ans: you cannot write to these memory address then. At minimum, the stack will not work 
+    // If dev = pin_mk_global also uses kern, we will not be able to communicate.
 
     // map first two MB for the kernel (1: code, 2: heap).
     //
@@ -115,6 +117,9 @@ void notmain(void) {
     uint32_t except_stack = INT_STACK_ADDR-OneMB;
 
     // Q2: if you comment this out, what happens?
+    // Ans: the abort handler (vector table) still has its home (0x0 - the kernel code)
+    // but the interrupt servcing routine will not work because we cannot push, pop
+    // registers to the exception stack.
     pin_mmu_sec(idx++, except_stack, except_stack, kern);
 
     // ******************************************************
@@ -125,6 +130,9 @@ void notmain(void) {
     // b4-42: give permissions for all domains.
 
     // Q3: if you set this to ~0, what happens w.r.t. Q1?
+    // Ans: ~0 means setting domain to Manager access (no check). 
+    // This effectively bypass the AXP, AP that we set (no_user, in this case).
+    // and now the user code can access these memory region will be out being faulted.
     staff_domain_access_ctrl_set(DOM_client << dom_kern*2); 
 
     // set address space id, page table, and pid.
