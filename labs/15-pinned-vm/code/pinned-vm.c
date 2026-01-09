@@ -84,15 +84,15 @@ uint32_t xlate_pa_get(void);
 int tlb_contains_va(uint32_t *result, uint32_t va) {
     // 3-79
     assert(bits_get(va, 0,2) == 0);
-    // return staff_tlb_contains_va(result, va);
 
     // Translate va->pa, privilege write permission (3-82)
     // not sure about the privileddge / user
     asm volatile("mcr p15, 0, %0, c7, c8, 1"::"r"(va): "memory");
+
     // read the pa value see if sucessful
-        uint32_t par;
+    uint32_t par;
     asm volatile("mrc p15, 0, %0, c7, c4, 0":"=r"(par):: "memory");
-    // trace("contains ? pa result: %x (%b) \n", par, par);
+
     // translation sucessful or not is in bit 0 (3-81) - 1 is abort
     if(bit_get(par, 0))
         return 0;
@@ -109,17 +109,10 @@ void pin_mmu_sec(unsigned idx,
                 uint32_t pa,
                 pin_t e) {
 
-    // staff_pin_mmu_sec(idx, va, pa, e);
-    // return;
-
     demand(idx < 8, lockdown index too large);
     // lower 20 bits should be 0.
     demand(bits_get(va, 0, 19) == 0, only handling 1MB sections);
     demand(bits_get(pa, 0, 19) == 0, only handling 1MB sections);
-
-    // if(va != pa)
-    //     panic("for today's lab, va (%x) should equal pa (%x)\n",
-    //             va,pa);
 
     debug("about to map %x->%x\n", va,pa);
     // these will hold the values you assign for the tlb entries.
@@ -127,20 +120,26 @@ void pin_mmu_sec(unsigned idx,
 
     // disable interrupt
     asm volatile("cpsid aif":::);
+
     // write an intended index to TLB lockdown index register
     x = idx & 0b111;
     asm volatile ("mcr p15, 5, %0, c15, c4, 2"::"r"(x): "memory");
+
     // write va to  TLB lockdown VA
     // ASID is bits [7:0]
     va_ent = (va & 0xfff00000) | (e.G << 9) | (e.asid);
+
     // trace("va_ent %x \n", va_ent);
     asm volatile("mcr p15, 5, %0, c15, c5, 2"::"r"(va_ent): "memory");
+    
     // write attr to TLB lockdown attribute
     attr = (e.dom << 7) | (e.mem_attr << 1);
     asm volatile ("mcr p15, 5, %0, c15, c7, 2"::"r"(attr): "memory");
+
     // write pa to TLB lockdown PA
     pa_ent = (pa & 0xfff00000) | (e.pagesize << 6) | (e.AP_perm << 1) | 1;
     asm volatile ("mcr p15, 5, %0, c15, c6, 2"::"r"(pa_ent): "memory");
+
     // barrier
     asm volatile ("mcr p15, 0, %0, c7, c10, 4" :: "r" (0) : "memory"); // DSB
     asm volatile ("mcr p15, 0, %0, c7, c5, 4"  :: "r" (0) : "memory"); // ISB/PrefetchFlush
@@ -148,7 +147,7 @@ void pin_mmu_sec(unsigned idx,
     // re-enable interrupt
     asm volatile("cpsie aif":::);
 
-#if 0
+#if 1
     // put this back in when defined.
     if((x = lockdown_va_get()) != va_ent)
         panic("lockdown va: expected %x, have %x\n", va_ent,x);
@@ -209,8 +208,6 @@ void pin_mmu_init(uint32_t domain_reg) {
     null_pt = kmalloc_aligned(4096*4, 1<<14);
     assert((uint32_t)null_pt % (1<<14) == 0);
     memset(null_pt, 0, 4096*4);
-    // null_pt[0] = 
-    // trace("null_pt: %x \n", null_pt);
     
     // set first-level (and second-level) deoscriptor page table (B4-41)
     asm volatile ("mcr p15, 0 , %0, c2, c0, 2"::"r"(zero)); // TLB control reg 16 KB, do walk on miss - (3-61)
@@ -221,46 +218,43 @@ void pin_mmu_init(uint32_t domain_reg) {
     asm volatile ("mcr p15, 0, %0, c7, c14, 0"::"r"(zero)); // clean and invalidate D-cache
     asm volatile ("mcr p15, 0, %0, c7, c5, 0"::"r"(zero)); // invalidate I-cache nad flush branch target cache
 
-    // turn on MMU via RMW table 3-39 (3-47) or B4-40
-    uint32_t control;
-    asm volatile ("mrc p15, 0, %0, c1, c0, 0" : "=r" (control));
-    control |= 0x1;    // Bit 0: MMU enable
-    control |= 0x1000; // Bit 12: I-cache enable
-    control |= 0x4;    // Bit 2: D-cache enable
+    // Don't do this yet. Init only set-up but not immediately enable
+    // we haven't mapped va->pa for any register yet. Turning this on right away will at least
+    // make the instruction points to the undefined place - and hence, prefetch abort
     
+    // turn on MMU via RMW table 3-39 (3-47) 
+    // uint32_t control;
+    // asm volatile ("mrc p15, 0, %0, c1, c0, 0" : "=r" (control):: "memory");
+    // control |= 0x1;    // Bit 0: MMU enable
+    // control |= 0x1000; // Bit 12: I-cache enable
+    // control |= 0x4;    // Bit 2: D-cache enable
     // asm volatile ("mcr p15, 0, %0, c1, c0, 0" :: "r" (control) : "memory");
 
-    // barrier
-    asm volatile ("mcr p15, 0, %0, c7, c10, 4" :: "r" (0) : "memory"); // DSB
-    asm volatile ("mcr p15, 0, %0, c7, c5, 4"  :: "r" (0) : "memory"); // ISB/PrefetchFlush
-
-    // may turn on I-D cache
-    trace("pin_mmu_init ... done\n");
+    // // barrier
+    // asm volatile ("mcr p15, 0, %0, c7, c10, 4" :: "r" (0) : "memory"); // DSB
+    // asm volatile ("mcr p15, 0, %0, c7, c5, 4"  :: "r" (0) : "memory"); // ISB/PrefetchFlush
     return;
 }
 
 void pin_mmu_switch(uint32_t pid, uint32_t asid) {
 
-    trace("in switch...null_pt: %x \n", null_pt);
     assert(null_pt);
-    // staff function to replace
-    // staff_mmu_set_ctx(pid, asid, null_pt);
 
     //  B2-25, do the asid<-0, prefetch flush, change TTBR,, prefetch flush, change asid to new val
-    uint32_t sbz = 0;
+    uint32_t zero = 0;
 
     // set ASID = 0 first to prevent alias (3-128)
     uint32_t tmp = pid << 8; // ASID = 0, PRODIC = pid
     asm volatile ("mcr p15, 0, %0, c13, c0, 1"::"r"(tmp): "memory");
 
     // prefetct flush
-    asm volatile ("mcr p15, 0, %0, c7, c5, 4"::"r"(sbz): "memory");
+    asm volatile ("mcr p15, 0, %0, c7, c5, 4"::"r"(zero): "memory");
 
     // change TTBR (set to null_pt)
     asm volatile ("mcr p15, 0, %0, c2, c0, 0"::"r"(null_pt): "memory");
 
     // prefetch flush
-    asm volatile ("mcr p15, 0, %0, c7, c5, 4"::"r"(sbz): "memory");
+    asm volatile ("mcr p15, 0, %0, c7, c5, 4"::"r"(zero): "memory");
 
     // set asid to asid
     uint32_t proc_asid = (pid << 8) | (asid & 0xff);
