@@ -19,7 +19,7 @@ static void inline remove_permission() {
     // disable it
     domains = bits_clr(domains, 2*dom_heap, 2*dom_heap + 1);
     asm volatile ("mcr p15, 0, %0, c3, c0, 0"::"r"(domains):"memory");
-    trace("remove permission %b \n", (domains >> (2*dom_heap)) & 0b11);
+    // trace("remove permission %b \n", (domains >> (2*dom_heap)) & 0b11);
 }
 
 static void inline enable_permission () {
@@ -30,15 +30,18 @@ static void inline enable_permission () {
     // re-enable as client
     domains |= (DOM_client << (2 * dom_heap));
     asm volatile ("mcr p15, 0, %0, c3, c0, 0"::"r"(domains):"memory");
-
-    trace("enable permission %b \n", (domains >> (2*dom_heap)) & 0b11);
+    // trace("enable permission %b \n", (domains >> (2*dom_heap)) & 0b11);
 }
 
 
 static void prefetch_abort_handler (regs_t *r) {
-    trace("PREFETCH FAULT DETECTED \n");
-    enable_permission();   
+    // the pc + 4 is saved to lr, so the jump instruction that causes this abort is at lr - 4
+    trace("PREFETCH FAULT DETECTED pc=%x lr=%x \n", r->regs[15], r->regs[14] - 4);
+    // trace("PREFETCH FAULT DETECTED \n");
 
+    // GET32(r->regs[15]) gives the instruction try to execute like add r1, r2 etc.
+    
+    enable_permission();
     return;
 }
 
@@ -52,10 +55,6 @@ static void fault_handler(regs_t *r) {
 
     // print pc (? means pc that causes fault), ARMv6 "reason" for the fault (dfsr)
     trace("FAULT DETECTED: fault_addr: %x \n", fault_addr);
-
-    // uint32_t pc;
-    // asm volatile ("mov %0, lr":"=r"(pc)::"memory");
-    // trace("FAULT DETECTED: pc (saved lr): %x \n", r[15]);
 
     // b4-43
     uint32_t dfsr;
@@ -206,9 +205,18 @@ void notmain(void) {
     
     // when returned, the permission is already re-enable
     remove_permission();
-    PUT32(heap_addr, 99);
+    // Write bx lr (0xe12fff1e) so we can jump to it and return.
+    // ! After the prefetch_handler, the CPU will retry the instruction that fails.
+    // We cannot put the random value (bx lr simply returns)
+    PUT32(heap_addr, 0xe12fff1e);
+    // PUT32(heap_addr, 0x11);
 
     remove_permission();
-    asm volatile ("blx %0"::"r"(heap_addr): "memory");
+    // Use a function pointer so that LR is set correctly for the return.
+    // void (*f)(void) = (void (*)(void))heap_addr;
+    // f(); // compiler will generate blx rn (where rn store address of f to jump to)
+
+    // may also do this instead
+    asm volatile ("blx %0" ::"r"(heap_addr): "lr");
     clean_reboot();
 }
