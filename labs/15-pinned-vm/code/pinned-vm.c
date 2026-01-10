@@ -292,7 +292,7 @@ void lockdown_print_entry(unsigned idx) {
         uint32_t dom, xn, tex, C, B;
         uint32_t attr = lockdown_attr_get(); 
         dom = (attr >> 7) & 0xf; xn = (attr >> 6) & 1; tex = (attr >> 3) & 0b111;
-        C = (attr >> 2) & 1; B = (attr > 1) & 1;
+        C = (attr >> 2) & 1; B = (attr >> 1) & 1;
 
         trace("     attr=%x: dom=%d|xn=%d|tex=%b|C=%d|B=%d\n",
                 attr, dom,xn,tex,C,B);
