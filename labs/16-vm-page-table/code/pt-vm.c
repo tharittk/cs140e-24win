@@ -14,7 +14,10 @@ vm_pt_t *vm_pt_alloc(unsigned n) {
     unsigned nbytes = 4096 * sizeof *pt;
 
     // allocate pt with n entries.
-    pt = staff_vm_pt_alloc(n);
+    // pt = staff_vm_pt_alloc(n);
+
+    pt = kmalloc_aligned(nbytes, 1 << 14);
+    memset(pt, 0, nbytes);
 
     demand(is_aligned_ptr(pt, 1<<14), must be 14-bit aligned!);
     return pt;
@@ -72,8 +75,35 @@ vm_map_sec(vm_pt_t *pt, uint32_t va, uint32_t pa, pin_t attr)
     assert(index < PT_LEVEL1_N);
 
     vm_pte_t *pte = 0;
-    return staff_vm_map_sec(pt,va,pa,attr);
+    // return staff_vm_map_sec(pt,va,pa,attr);
 
+    // define the address of first-level descriptor
+    // upper 18-bit comes from the Traslation Base (pt - 4096 entries)
+    // next 12-bit comes from index (upper 12-bit of va)
+    // last two bits are 00 (1 MB section) - B4-29
+    uint32_t ttbr = (uint32_t) pt;
+    unsigned fld_addr = ttbr | (index << 2);
+
+    fld_t fld = {
+        .tag=0b10,
+        .B=mem_attr_B(attr.mem_attr),
+        .C=mem_attr_C(attr.mem_attr),
+        .XN=0, // we never map code here ?
+        .domain=attr.dom,
+        .IMP=0, // b4-26
+        .AP=attr.AP_perm,
+        .TEX=mem_attr_TEX(attr.mem_attr),
+        .APX=(attr.AP_perm >> 2),
+        .S=0b0, //deprecate
+        .nG = !attr.G,
+        .super=0b0, // 1MB (section)
+        ._sbz1=0b0,
+        .sec_base_addr= (pa >> 20) // upper 12 bit of pa
+    };
+
+    pte = &fld;
+
+    PUT32(fld_addr, *(unsigned int*)pte);
 
     if(verbose_p)
         vm_pte_print(pt,pte);

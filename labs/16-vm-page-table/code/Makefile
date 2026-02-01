@@ -1,9 +1,9 @@
 BOOTLOADER = my-install
 
-PROGS += tests/1-test-basic.c
-PROGS += tests/1-test-setup.c
-PROGS += tests/1-test-two-addr.c
-PROGS += tests/2-test-procmap.c
+PROGS += tests-2.0/1-test-basic.c
+PROGS += tests-2.0/1-test-setup.c
+PROGS += tests-2.0/1-test-two-addr.c
+PROGS += tests-2.0/2-test-procmap.c
 
 O = $(CS140E_2024_PATH)/libpi
 STAFF_OBJS += $(O)/staff-objs/staff-full-except.o
@@ -36,6 +36,7 @@ TTYUSB =
 # set RUN = 1 if you want the code to automatically run after building.
 RUN = 1
 
+GREP_STR := 'TRACE:\|HASH:\|ERROR:\|PANIC:\|SUCCESS:'
 include $(CS140E_2024_PATH)/libpi/mk/Makefile.robust
 
 clean::

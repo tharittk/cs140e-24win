@@ -77,3 +77,4 @@ void vm_pte_print(vm_pt_t *pt, vm_pte_t *pte);
 void vm_mprotect(vm_pt_t *pt, unsigned va, unsigned nsec, pin_t perm);
 
 #endif
+
