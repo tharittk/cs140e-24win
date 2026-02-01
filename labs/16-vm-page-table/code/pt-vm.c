@@ -4,7 +4,7 @@
 #include "procmap.h"
 
 // turn this off if you don't want all the debug output.
-enum { verbose_p = 1 };
+enum { verbose_p = 0};
 enum { OneMB = 1024*1024 };
 
 vm_pt_t *vm_pt_alloc(unsigned n) {
@@ -114,7 +114,28 @@ vm_map_sec(vm_pt_t *pt, uint32_t va, uint32_t pa, pin_t attr)
 // lookup 32-bit address va in pt and return the pte
 // if it exists, 0 otherwise.
 vm_pte_t * vm_lookup(vm_pt_t *pt, uint32_t va) {
-    return staff_vm_lookup(pt,va);
+    // Good for cross-check
+    // combine the translation base and the index from upper 12-bit of va
+    // uint32_t pte_addr = (uint32_t) pt | ((va >> 20) << 2);
+    // trace("va: %x, pte_addr: %x \n", va, pte_addr);
+
+    // NOTE: you don't do << 2 (x4) here. The pointer arithmatic from C
+    // already does the job. You do pt[index], it will increase 4 bytes per index
+    // already. In the 'hand-rolled' version above, you do << 2 because you are
+    // in bit-representation and you know that each pte takes 4 bytes (addr of fld will
+    // have last 2 bits = 0b00)
+    vm_pte_t* pte_ptr = &pt[va >> 20];
+    // trace("pte_ptr: %x, *pte_ptr : %x \n", pte_ptr, *pte_ptr);
+
+    // dereference check if it is zero (empty pte)
+    if (*(uint32_t*)pte_ptr != 0){
+        // trace("not null");
+        return pte_ptr;
+    } else {
+        // trace("null");
+        return 0;
+    }
+    // return staff_vm_lookup(pt,va);
 }
 
 // manually translate <va> in page table <pt>
@@ -124,7 +145,19 @@ vm_pte_t * vm_lookup(vm_pt_t *pt, uint32_t va) {
 //
 // NOTE: we can't just return the result b/c page 0 could be mapped.
 vm_pte_t *vm_xlate(uint32_t *pa, vm_pt_t *pt, uint32_t va) {
-    return staff_vm_xlate(pa,pt,va);
+    // Refer to B4-29
+    vm_pte_t* pte_addr = vm_lookup(pt, va);
+    if (*(uint32_t*) pte_addr) {
+        // getting pa
+        fld_t fld = *pte_addr;
+        assert(fld.tag == 0b10);
+        // upper 12 bit of fld | lower 20 bit of va
+        *pa = (fld.sec_base_addr << 20) | (va & 0xfffff);
+        return pte_addr; 
+    } else {
+        return 0;
+    }
+    // return staff_vm_xlate(pa,pt,va);
 }
 
 // compute the default attribute for each type.
