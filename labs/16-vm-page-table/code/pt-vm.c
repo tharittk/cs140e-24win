@@ -4,7 +4,7 @@
 #include "procmap.h"
 
 // turn this off if you don't want all the debug output.
-enum { verbose_p = 0};
+enum { verbose_p = 1};
 enum { OneMB = 1024*1024 };
 
 vm_pt_t *vm_pt_alloc(unsigned n) {
@@ -190,7 +190,40 @@ vm_pt_t *vm_map_kernel(procmap_t *p, int enable_p) {
 
     vm_pt_t *pt = 0;
 
-    return staff_vm_map_kernel(p,enable_p);
+    // return staff_vm_map_kernel(p,enable_p);
+
+    // compute domain mask
+    uint32_t d = dom_perm(p->dom_ids, DOM_client);
+
+    // initialize vm with the mask
+    vm_mmu_init(d);
+
+    // allocate page table
+    pt = vm_pt_alloc(4096);
+
+    // setup all the mapping (mirror procmap_pin() in lab15)
+    for (unsigned i = 0; i < p->n; i++){
+        pr_ent_t* e = &p->map[i];
+        demand(e->nbytes == MB, "nbytes=%d\n", e->nbytes);
+
+        pin_t attr = attr_mk(e);
+
+        // map to the table: va = pa
+        // trace("Pinning [%d]: va: %x pa %x \n", i, e->addr, e->addr);
+        vm_map_sec(pt, e->addr, e->addr, attr);
+    }
+
+    // make sure they exist
+    for (unsigned i = 0; i < p->n; i++) {
+        if (!vm_lookup(pt, p->map[i].addr)){
+            panic("vm_lookup fails at p->map[%d].addr: ", i, p->map[i].addr);
+        }
+    }
+
+    if (enable_p){
+        vm_mmu_switch(pt, kern_pid, kern_asid);
+        vm_mmu_enable();
+    }
 
     assert(pt);
     return pt;
