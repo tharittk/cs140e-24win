@@ -4,7 +4,10 @@ PROGS += tests-2.0/1-test-basic.c
 PROGS += tests-2.0/1-test-setup.c
 PROGS += tests-2.0/1-test-two-addr.c
 PROGS += tests-2.0/2-test-procmap.c
-# PROGS += tests-2.0/3-test-setup.c
+
+# need pinned-vm
+PROGS += tests-2.0/3-test-setup.c
+PROGS += tests-2.0/2-test-lookup.c
 
 
 O = $(CS140E_2024_PATH)/libpi
@@ -14,6 +17,10 @@ STAFF_OBJS += $(O)/staff-objs/staff-switchto-asm.o
 
 # this is the one file you'll modify.
 COMMON_SRC += pt-vm.c
+# Try pulling the pinned-vm.c from previous lab to run all the test in directory
+# COMMON_SRC += ../../15-pinned-vm/code/pinned-vm.c
+# Now I just copy
+COMMON_SRC += pinned-vm.c
 
 # you'll write this next time.
 COMMON_SRC += your-mmu-asm.S 

@@ -1,7 +1,8 @@
 /* Miles' little test for tlb_contains_va */
 
 #include "rpi.h"
-#include "procmap.h"
+#include "procmap_pinned.h"
+#include "pinned-vm.h"
 
 void notmain(void) { 
     // map the heap: for lab cksums must be at 0x100000.
