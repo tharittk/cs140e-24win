@@ -48,8 +48,12 @@ MK_FN(mmu_reset)
 //   - I don't *think* we need the full cp15 sync: flush_btb, 
 //     dsb, prefetch flush.
 MK_FN(cp15_domain_ctrl_wr)
-    b staff_cp15_domain_ctrl_wr
-    asm_not_implemented()
+    @ b staff_cp15_domain_ctrl_wr
+    @ asm_not_implemented()
+    @ same as domain access control set
+
+    mcr p15, 0, r0, c3, c0, 0 @ read
+    mcr p15, 0, r0, c7, c5, 4 @ PREFETCH FLUSH
     bx lr
 
 // void cp15_set_procid_ttbr0(uint32_t proc_and_asid, fld_t *pt);
