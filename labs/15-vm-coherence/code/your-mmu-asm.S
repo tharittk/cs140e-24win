@@ -37,9 +37,30 @@ MK_FN(get_cache_type)
 // void reset(void)
 // clear the dcache, icache, tlbs
 MK_FN(mmu_reset)
-    b staff_mmu_reset
+    mov r0, #0
 
-    asm_not_implemented()
+    @ B4-45: Invalidate entire I-cache (with ARM Errata)
+    mcr p15, 0, r0, c7, c5, 0   ; /* invalidate entire I-cache */   \
+    mcr p15, 0, r0, c7, c5, 0;  ; /* invalidate entire I-cache */   \
+    mcr p15, 0, r0, c7, c5, 0;  ; /* invalidate entire I-cache */   \
+    mcr p15, 0, r0, c7, c5, 0;  ; /* invalidate entire I-cache */   \
+    .rept   11                  ; /* ARM Ltd recommends at least 11 nops */\
+    nop                         ;                                   \
+    .endr
+
+    @ we don't "clean" the cache because we don't want to write it back (current data could be garbage)
+    mcr p15, 0, r0, c7, c6, 0  @ invlidaate D-CACHE 
+
+    @ B4-45: Invalidate both I-TLB and D-TLB cache
+    mcr p15, 0, r0, c8, c7, 0
+    @ B2-22: Looks like TLB maintenance should be followed by a prefetch flush.
+    @ B2-24: Since this is CP15 maintenance, we need to do prefect flush
+    @ why prefetch flush makes sense ? since we are invalidating I-TLB, 
+    @the pipeleine could have prefetched instructions based on stale TLB entries (the one invalidated)
+    mcr p15, 0, r0, c7, c5, 4  
+
+    @ B2-22: TLB maintenance and subsequent prefetch flush are guaranteed to be completed with DSB
+    mcr p15, 0, r0, c7, c10, 4 @ DSB
     bx lr
 
 // void cp15_domain_ctrl_wr(uint32_t dom_reg);
