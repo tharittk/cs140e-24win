@@ -19,6 +19,7 @@ int mmu_is_enabled(void)
 // we use a C veneer over the assembly (mmu_disable_set_asm)
 // so we can easily do assertions: the real work is
 // done by the asm code (you'll write this next time).
+void mmu_disable_set_asm(cp15_ctrl_reg1_t c); // defined in your-mmu-asm.S
 void mmu_disable_set(cp15_ctrl_reg1_t c)
 {
     assert(!c.MMU_enabled);
@@ -26,7 +27,8 @@ void mmu_disable_set(cp15_ctrl_reg1_t c)
     // record if dcache on.
     uint32_t cache_on_p = c.C_unified_enable;
 
-    staff_mmu_disable_set_asm(c);
+    // staff_mmu_disable_set_asm(c);
+    mmu_disable_set_asm(c);
 
     // re-enable if it was on.
     if (cache_on_p)
@@ -52,10 +54,12 @@ void mmu_disable(void)
 // <c>.   we start in C so we can do assertions
 // and then call out to the assembly for the
 // real work (you'll write this code next time).
+void mmu_enable_set_asm(cp15_ctrl_reg1_t c); // defined in your-mmu-asm.S
 void mmu_enable_set(cp15_ctrl_reg1_t c)
 {
     assert(c.MMU_enabled);
-    staff_mmu_enable_set_asm(c);
+    // staff_mmu_enable_set_asm(c);
+    mmu_enable_set_asm(c);
 }
 
 // enable mmu by flipping enable bit.
@@ -112,7 +116,7 @@ uint32_t domain_access_ctrl_get(void)
 
 // b4-42
 // set domain access control register to <r>
-void cp15_domain_ctrl_wr(uint32_t r);
+void cp15_domain_ctrl_wr(uint32_t r); // defined in your-mmu.asm
 __attribute__((weak)) void domain_access_ctrl_set(uint32_t r)
 {
     // staff_domain_access_ctrl_set(r);

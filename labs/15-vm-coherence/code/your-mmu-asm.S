@@ -52,11 +52,12 @@ MK_FN(mmu_reset)
     mcr p15, 0, r0, c7, c6, 0  @ invlidaate D-CACHE 
 
     @ B4-45: Invalidate both I-TLB and D-TLB cache
+    @ otherwise, when you enable, you might have TLB hit from the previous mapping (which may not be valid)
     mcr p15, 0, r0, c8, c7, 0
     @ B2-22: Looks like TLB maintenance should be followed by a prefetch flush.
     @ B2-24: Since this is CP15 maintenance, we need to do prefect flush
     @ why prefetch flush makes sense ? since we are invalidating I-TLB, 
-    @the pipeleine could have prefetched instructions based on stale TLB entries (the one invalidated)
+    @ the pipeline could have prefetched instructions based on stale TLB entries (the one invalidated)
     mcr p15, 0, r0, c7, c5, 4  
 
     @ B2-22: TLB maintenance and subsequent prefetch flush are guaranteed to be completed with DSB
@@ -87,7 +88,7 @@ MK_FN(cp15_set_procid_ttbr0)
 
 // void mmu_disable_set_asm(cp15_ctrl_reg1_t c);
 MK_FN(mmu_disable_set_asm)
-    b staff_mmu_disable_set_asm
+    @ b staff_mmu_disable_set_asm
 
     @ note: this piece of code is mapped into the same place in both
     @ MMU-enabled and MMU-disabled so BTB and Prefetch entries work identically
@@ -97,14 +98,66 @@ MK_FN(mmu_disable_set_asm)
     @ flush, but instructions could get fetched before we could disable,
     @ defeating the purpose.
 
-    asm_not_implemented()
+    @ 3-74 Clean the D-Cache and write it back to memory
+    @ ... and invalidadate - because now the address that may cause
+    @ cache hit with mmu enable should not cause hit when disable.
+    mov r1, #0
+    mcr p15, 0, r1, c7, c14, 0  
+
+    @ Test case required
+    @ B4-45: Invalidate entire I-cache (with ARM Errata)
+    mcr p15, 0, r0, c7, c5, 0   ; /* invalidate entire I-cache */   \
+    mcr p15, 0, r0, c7, c5, 0;  ; /* invalidate entire I-cache */   \
+    mcr p15, 0, r0, c7, c5, 0;  ; /* invalidate entire I-cache */   \
+    mcr p15, 0, r0, c7, c5, 0;  ; /* invalidate entire I-cache */   \
+    .rept   11                  ; /* ARM Ltd recommends at least 11 nops */\
+    nop                         ;                                   \
+    .endr
+
+    @ Test case required - but already handle in Clean & Invalidate D-Cache above
+    @ Invalidate D-Cache
+    @ mcr p15, 0, r0, c7, c6, 0  @ invlidaate D-CACHE 
+
+    @ Disble MMU. Control is pre-programmed in r0
+    mcr p15, 0, r0, c1, c0, 0
+
+    mov r0, #0
+    mcr p15, 0, r0, c7, c10, 4 @ DSB
+
+    mcr p15, 0, r0, c7, c5, 4 @ PREFETCH FLUSH
+
+    mcr p15, 0, r0, c7, c5, 6 @ FLUSH BTB
     bx lr
 
 // void mmu_enable_set_asm(cp15_ctrl_reg1_t c);
 MK_FN(mmu_enable_set_asm)
-    b staff_mmu_enable_set_asm
+    @ b staff_mmu_enable_set_asm
 
-    asm_not_implemented()
+    @ Assume mmu_reset() is called earlier
+
+    @ 6-9
+    @ Program all relevant CP15 registers of the corresponding world.
+    @ [done in mmu_init] Program first-level and second-level descriptor page tables as required.
+    @ [done in mmu_reset] Disable and invalidate the Instruction Cache for the corresponding world.
+
+    @ Enable the MMU by setting bit 0 in the CP15 Control Register in the corresponding world
+    @ r0 holds the pre-programmed register
+    mcr p15, 0, r0, c1, c0, 0
+
+    @ Why DSB -> Prefect Flush -> BTB ?
+    @ DSB -> PF: must wait until the CP15 maintenance takes effect so that the newly fetched instruction
+    @ is the valid one. If you PF first, the incoming fetched intruction may still refer the old mapping 
+    @ , physical address in this case because MMU was not active.
+
+    @ PF -> BTB: If you clean the BTB, the just-became stale instructions in the pipeline may pollute the BTB (calculation logic)
+    @ (I think it might not be so bad since you will mispredict that anyway? - not so. You execute the bad address. In bare-metal, you might halt the system)
+    mov r0, #0
+    mcr p15, 0, r0, c7, c10, 4 @ DSB
+
+    mcr p15, 0, r0, c7, c5, 4 @ PREFETCH FLUSH
+
+    mcr p15, 0, r0, c7, c5, 6 @ FLUSH BTB
+
     bx lr
 
 MK_FN(mmu_sync_pte_mods)
