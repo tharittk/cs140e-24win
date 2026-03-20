@@ -81,11 +81,57 @@ MK_FN(cp15_domain_ctrl_wr)
 // void cp15_set_procid_ttbr0(uint32_t proc_and_asid, fld_t *pt);
 // sequence from b2-25
 MK_FN(cp15_set_procid_ttbr0)
-    b staff_cp15_set_procid_ttbr0
+    @ b staff_cp15_set_procid_ttbr0
 
-    asm_not_implemented()
+    @ 1. 
+    @ B4-41: The hardware has to be able to find the page table when there is a TLB miss. 
+    @ You will write the address of the page table to the page table register ttbr0, 
+    @ set both TTBR1 and TTBC to 0. (See below) Note the alignment restriction
+
+    @ 2.
+    @ B4-52: The ARM allows each TLB entry to be tagged with an address space identifier 
+    @ so you don't have to flush when you switch address spaces. 
+    @ Set the current address space identifier (pick a number between 1..63).
+    @ B4-52 points to B2-24
+
+    @ 3.
+    @ Coherence requirements: B2-21, B2-22, B2-23, B2-24 rules for changing page table register. 
+    @ And B2-25 the cookbook for changing an ASID.
+    @ ------------------------------------------
+    @ B4-52: DSB should be executed before changing reg13
+    mcr p15, 0, r3, c7, c10, 4 @ DSB
+
+    // Follows B2-24 sequence (pretty much pinned-vm.c: mmu-switch)
+    // set ASID = 0 first to prevent alias (3-128)
+    lsl r4, r0, #8
+    mcr p15, 0, r4, c13, c0, 1
+    // B2.7.5 Do BTB after change to ProcessID, followed by prefect flush
+    mov r3, #0
+    mcr p15, 0, r3, c7, c5, 6 @ FLUSH BTB
+    mcr p15, 0, r3, c7, c5, 4 @ PREFETCH FLUSH
+
+    // set TTBRs
+    @ 3-61: ttbr0, ttbr1, ttbc
+    @ upper 18-bit, pt is the second argument (r1), 14-bit = 16 KB alignment
+    mcr p15, 0, r1, c2, c0, 0 @ Write Translation Table Base Register 0 (pt is arg1)
+    mcr p15, 0, r3, c7, c5, 6 @ FLUSH BTB
+    mcr p15, 0, r3, c7, c5, 4 @ PREFETCH FLUSH
+
+    mcr p15, 0, r3, c2, c0, 1 @ Write Translation Table Base Register 1 (set to 0)
+    mcr p15, 0, r3, c7, c5, 6 @ FLUSH BTB
+    mcr p15, 0, r3, c7, c5, 4 @ PREFETCH FLUSH
+
+    mcr p15, 0, r3, c2, c0, 2 @ Write Translation Table Base Control Register (set to 0)
+    mcr p15, 0, r3, c7, c5, 6 @ FLUSH BTB
+    mcr p15, 0, r3, c7, c5, 4 @ PREFETCH FLUSH
+
+    // set asid to asid - original r0
+    // B2.7.5 Do BTB after change to ttbr0, ttbr1, ttbcr, followed by prefect flush
+    mcr p15, 0, r0, c13, c0, 1
+    mcr p15, 0, r3, c7, c5, 6 @ FLUSH BTB
+    mcr p15, 0, r3, c7, c5, 4 @ PREFETCH FLUSH
+
     bx lr
-
 // void mmu_disable_set_asm(cp15_ctrl_reg1_t c);
 MK_FN(mmu_disable_set_asm)
     @ b staff_mmu_disable_set_asm
@@ -165,6 +211,7 @@ MK_FN(mmu_enable_set_asm)
 MK_FN(mmu_sync_pte_mods)
     @ b staff_mmu_sync_pte_mods
     @ STR rx, [Page table entry] ;
+
     @ Clean line [Page table entry]
     @ B6-21: the code does not give specific MVA, so I flush the whole D-cache line (writeback)
     mov r0, #0
