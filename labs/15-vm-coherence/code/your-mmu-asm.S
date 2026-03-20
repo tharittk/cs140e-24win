@@ -103,8 +103,8 @@ MK_FN(cp15_set_procid_ttbr0)
 
     // Follows B2-24 sequence (pretty much pinned-vm.c: mmu-switch)
     // set ASID = 0 first to prevent alias (3-128)
-    lsl r4, r0, #8
-    mcr p15, 0, r4, c13, c0, 1
+    lsl r2, r0, #8
+    mcr p15, 0, r2, c13, c0, 1
     // B2.7.5 Do BTB after change to ProcessID, followed by prefect flush
     mov r3, #0
     mcr p15, 0, r3, c7, c5, 6 @ FLUSH BTB
