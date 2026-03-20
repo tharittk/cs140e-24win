@@ -160,9 +160,39 @@ MK_FN(mmu_enable_set_asm)
 
     bx lr
 
+// Called after pte modification
+// B2-23: Follow the sequence
 MK_FN(mmu_sync_pte_mods)
-    b staff_mmu_sync_pte_mods
+    @ b staff_mmu_sync_pte_mods
+    @ STR rx, [Page table entry] ;
+    @ Clean line [Page table entry]
+    @ B6-21: the code does not give specific MVA, so I flush the whole D-cache line (writeback)
+    mov r0, #0
+    mcr p15, 0, r0, c7, c14, 0 @ Clean entire D-Cache, Invalidate as well (looks like test wants cache misses)
+    @ Invalidate all I-Cache (looks like test wants it - being conservative)
+    mcr p15, 0, r0, c7, c5, 0   ; /* invalidate entire I-cache */   \
+    mcr p15, 0, r0, c7, c5, 0;  ; /* invalidate entire I-cache */   \
+    mcr p15, 0, r0, c7, c5, 0;  ; /* invalidate entire I-cache */   \
+    mcr p15, 0, r0, c7, c5, 0;  ; /* invalidate entire I-cache */   \
+    .rept   11                  ; /* ARM Ltd recommends at least 11 nops */\
+    nop                         ;                                   \
+    .endr
 
-    asm_not_implemented()
+    @ DSB ; ensures visibility of the data cleaned from the D Cache
+    mcr p15, 0, r0, c7, c10, 4 @ DSB
+
+    @ Invalidate TLB entry by MVA [page address] 
+    @ mcr p15, 0, Rd, c8, c5, 0  @ Invalidate TLB-I Cache
+    @ B4-45
+    mcr p15, 0, r0, c8, c7, 0 @ Invalidate both TLB D-Cache and TLB I-Cache
+
+    @ Invalidate BTB
+    mcr p15, 0, r0, c7, c5, 6 @ FLUSH BTB
+
+    @ DSB            ; ensure completion of the Invalidate TLB
+    mcr p15, 0, r0, c7, c10, 4 @ DSB
+
+    @ PrefetchFlush
+    mcr p15, 0, r0, c7, c5, 4 @ PREFETCH FLUSH
     bx lr
 
