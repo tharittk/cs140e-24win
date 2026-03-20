@@ -38,5 +38,6 @@ own simple, clean operating system for the widely-used, ARM-based
 
 - [x] Virtual Memory (Pinned TLB): Enable a working VM system using pinned TLB entries; handle permission faults, domain faults, and unmapped memory exceptions.
 - [x] Virtual Memory (Page Tables): Implement a section-based 1-level page table replacing the pinned approach from the previous lab. Simulate page-table walk of the MMU unit for double-check.
+- [x] VM Coherency: Write ARM assembly, making sure state is coherent when: setting up the page table register, ASID, and domains. turning on/off the MMU.
 
-Last updated @ March 12, 2026
+Last updated @ March 20, 2026
